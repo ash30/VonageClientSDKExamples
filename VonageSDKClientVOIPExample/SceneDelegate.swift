@@ -44,6 +44,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             
         }.store(in: &cancellables)
              
+        app.appplicationCallState.localHangups.sink { _ in
+            // TODO handle errors
+        }.store(in: &cancellables)
+        
         // For new calls, present the active call screen IFF its not presently displayed
         app.applicationState.user
             .combineLatest(

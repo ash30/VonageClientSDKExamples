@@ -12,6 +12,25 @@ import UIKit
 import VonageClientSDKVoice
 
 
+// MARK: Application Models
+
+/// We define some general application concepts like connectivity and users.
+/// Its assumed applications intergrating the Client SDK will have this define already
+
+enum Connection {
+    case unknown
+    case connected
+    case reconnecting
+    case disconnected(err:Error?)
+}
+
+struct User {
+    let info: UserDetails
+    let token: String
+}
+
+// MARK: Application State
+
 class ApplicationState: NSObject, UserIdentityDelegate, PKPushRegistryDelegate {
 
     // private deps

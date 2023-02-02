@@ -69,7 +69,6 @@ class ActiveCallViewController: UIViewController {
         
         viewModel.$call
             .map { $0.status }
-            // deduplicate just incase...
             .scan((state:.unknown, didChange:false)){ current, new in (new , current.0 != new) }.filter { $0.1 }.map {$0.0}
             .sink(receiveValue: { s in
             switch(s) {
@@ -113,15 +112,11 @@ class ActiveCallViewController: UIViewController {
     }
     
     func eventuallyDismiss() {
-        Timer.publish(every: 1, on: RunLoop.main, in: .default).autoconnect().first().sink {  _ in
+        Timer.publish(every: 1.5, on: RunLoop.main, in: .default).autoconnect().first().sink {  _ in
             if self.navigationController?.topViewController == self{
                 self.navigationController?.popViewController(animated: true)
             }
         }.store(in: &self.cancels)
-    }
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -138,7 +133,6 @@ class ActiveCallViewController: UIViewController {
         calleeLabel = UILabel()
         calleeLabel.textAlignment = .center
         calleeLabel.font = UIFont.preferredFont(forTextStyle: .title1)
-
         
         callStatusLabel = UILabel()
         calleeLabel.textAlignment = .center
@@ -234,7 +228,7 @@ class ActiveCallViewController: UIViewController {
     }
     
     @objc func hangupButtonPressed(_ sender:UIButton) {
-        viewModel?.call.ref.hangup { _ in }
+        NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalHangupNotification, object:nil, userInfo: ["call": viewModel?.call.ref as Any])
     }
 }
 
