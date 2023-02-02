@@ -4,6 +4,10 @@
 //
 //  Created by Ashley Arthur on 25/01/2023.
 //
+
+/// We create a simple implementation for user session / identity
+/// Its the applications responsibility to provide the Vonage Client with a valid JWT token
+/// which assumedly will be tied to their existing user auth flow.
  
 typealias UserCredentials = (uname:String, pword:String)
 

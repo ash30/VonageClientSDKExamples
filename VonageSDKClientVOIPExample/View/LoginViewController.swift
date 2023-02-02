@@ -13,9 +13,7 @@ class LoginViewModel {
     private var identity: UserIdentityManager
     
     @objc func loginUser(name:String, password:String) {
-        identity.authenticate((name,password)) { err in
-            //
-        }
+        identity.authenticate((name,password)) { _ in  }
     }
     
     init(identity: UserIdentityManager) {
@@ -62,7 +60,6 @@ class LoginViewController: UIViewController {
         stackView.addArrangedSubview(passwordInput)
         stackView.addArrangedSubview(submitButton)
 
-        
         view.addSubview(stackView)
         
         NSLayoutConstraint.activate([
@@ -71,11 +68,6 @@ class LoginViewController: UIViewController {
             stackView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.8),
             stackView.heightAnchor.constraint(equalToConstant: 200)
         ])
-    }
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        // Do any additional setup after loading the view.
     }
     
     @objc func submitButtonPressed(_ sender:UIButton) {
