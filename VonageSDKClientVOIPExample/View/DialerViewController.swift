@@ -18,10 +18,6 @@ class DialerViewModel: ObservableObject{
             .vonageConnectionState
             .assign(to: \.connection, on:self).store(in: &self.cancellables)
     }
-    
-    func initiateCall(){
-        
-    }
 }
 
 

@@ -26,6 +26,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         self.nav = UINavigationController(rootViewController:dialerVC)
         nav.navigationItem.setHidesBackButton(true, animated: false)
         
+
         app.applicationState.user
             .receive(on: RunLoop.main)
             .sink { (user) in
@@ -35,35 +36,27 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 }
                 else {
                     self.window?.rootViewController = self.nav
-                    
                 }
             }
             .store(in: &cancellables)
-             
-        app.appplicationCallState.activeCalls.sink { _ in
-            
-        }.store(in: &cancellables)
-             
-        app.appplicationCallState.localHangups.sink { _ in
-            // TODO handle errors
-        }.store(in: &cancellables)
         
-        // For new calls, present the active call screen IFF its not presently displayed
+        
         app.applicationState.user
             .combineLatest(
-                app.appplicationCallState.outbound
+                app.appplicationCallState.outboundCalls
+                    .merge(with: app.appplicationCallState.inboundCalls)
             )
-            .filter{ (user,_) in user != nil}
-            .flatMap { (_,call) in call.first() }
             .receive(on: RunLoop.main)
-            .sink { call in
-                if (self.nav.topViewController != activeCallVC){
-                    activeCallVC.viewModel = ActiveCallViewModel(for:call, all_calls: app.appplicationCallState.activeCalls.receive(on: RunLoop.main))
+            .sink { (user, newCall) in
+                guard user != nil else {
+                    return 
+                }
+                if (self.nav.topViewController != activeCallVC) {
+                    activeCallVC.viewModel = ActiveCallViewModel(for:newCall.print("foo1a"))
                     self.nav.pushViewController(activeCallVC, animated: true)
                 }
             }
             .store(in: &cancellables)
-        
         self.window?.makeKeyAndVisible()
 
     }

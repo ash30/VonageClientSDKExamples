@@ -20,23 +20,68 @@ let VonageLegStatusRinging = "ringing"
 let VonageLegStatusAnswered = "answered"
 let VonageLegStatusCompleted = "completed"
 let LocalComplete = "LocalComplete"
+let LocalReject = "LocalReject"
 
 /// The Vonage Client offers the flexibility and freedom for customers to define their own CallModel
-/// to suit their use case. In this sample application we will define a traditional PSTN like model.
+/// to suit their use case. In this sample application we will define a traditional PSTN one to one call model.
 ///
-enum OneToOneCallState {
+enum CallState {
     case ringing
     case answered
     case rejected
     case canceled
     case completed
     case unknown
+}
+
+enum OneToOneCall {
+    case inbound(id:String, from:String, status:CallState)
+    case outbound(id:String, to:String, status:CallState)
+    
+    init(call:Self, status: CallState){
+        switch (call){
+        case .inbound(let id, let from, _):
+            self = .inbound(id:id, from: from, status:status )
+        case .outbound(let id, let to, _):
+            self = .outbound(id: id, to: to, status: status)
+        }
+    }
+    var status: CallState {
+        get {
+            switch(self) {
+            case .outbound(_,_,let status):
+                return status
+            case .inbound(_,_,let status):
+                return status
+            }
+        }
+    }
+    
+    var id: CallId {
+        get {
+            switch(self) {
+            case .outbound(let callId,_,_):
+                return callId
+            case .inbound(let callId,_,_):
+                return callId
+            }
+        }
+    }
     
     /// The input to transition our state machine will be the callbacks provided by the ClientSDK Delegate
     ///
-    func nextState(input:(call:CallId,leg:LegId,status:String)) -> Self {
-        switch self {
-        case .ringing where input.call != input.leg:
+    func nextState(input:(call:CallId,leg:LegId,status:String)) -> CallState {
+        switch(self){
+        case .inbound:
+            return nextStateInbound(input:input)
+        case .outbound:
+            return nextStateOutbound(input:input)
+        }
+    }
+    
+    private func nextStateOutbound(input:(call:CallId,leg:LegId,status:String)) -> CallState {
+        switch (self.status) {
+        case .ringing where (input.call != input.leg && input.status == VonageLegStatusAnswered):
             return .answered
         case .ringing where input.status == VonageLegStatusCompleted:
             return .rejected
@@ -46,41 +91,30 @@ enum OneToOneCallState {
         case .answered where input.status == VonageLegStatusCompleted:
             return .completed
         default:
-            return self
+            return self.status
+        }
+    }
+    
+    private func nextStateInbound(input:(call:CallId,leg:LegId,status:String)) -> CallState {
+        switch (self.status) {
+        case .ringing where input.call == input.leg && input.status == VonageLegStatusAnswered:
+            return .answered
+        case .ringing where input.status == VonageLegStatusCompleted:
+            return .canceled
+        case .ringing where input.status == LocalReject:
+            return .rejected
+        case .answered where input.status == VonageLegStatusCompleted:
+            return .completed
+        default:
+            return self.status
         }
     }
 }
 
-enum CallDetails {
-    case inbound(from:String)
-    case outbound(to:String, context:[String:any Hashable])
-}
-
-struct BaseCall<T> {
-    let id: String
-    let to: String
-    let status: T
-    let ref: VGVoiceCall
-    
-    init(id:String, to:String, status:T, ref:VGVoiceCall) {
-        self.id = id
-        self.to = to
-        self.status = status
-        self.ref = ref
-    }
-    
-    init(call:Self, status:T){
-        self.id = call.id
-        self.to = call.to
-        self.status = status
-        self.ref = call.ref
-    }
-}
 
 /// Convenience alias because we only support one type of call within this application
 ///
-typealias Call = BaseCall<OneToOneCallState>
-
+typealias Call = OneToOneCall
 
 
 // MARK: Application Call State
@@ -88,36 +122,42 @@ typealias Call = BaseCall<OneToOneCallState>
 /// We define the state of our application's call within a central state model
 /// so the rest of the application can understand what to display
 ///
-class ApplicationCallState: NSObject,VGVoiceClientDelegate {
+class ApplicationCallState: NSObject {
         
-    private let vonage: VGVoiceClient
+    private let vonage: VonageClientState
     private let appState: ApplicationState
     
-    // MARK: Session
+
+    // MARK: INIT
     
-    /// Our Vonage Session is based on transforming the application logged in user
-    /// this way we couple their lifetimes .e.g When logged out, we should disconnect from vonage backend
-    ///
+    init(from appState:ApplicationState, and vonageClient:VGVoiceClient){
+        self.vonage = VonageClientState(vonageClient: vonageClient)
+        self.appState = appState
+        super.init()
+    }
+    
+    // MARK: Connectivity
+        
     private lazy var vonageSessionId = appState
         .vonageServiceToken
         .flatMap { token in
             Future<String,Never>{ p in
-                self.vonage.createSession(token, sessionId: nil) {err, sessionId in
+                self.vonage.client.createSession(token, sessionId: nil) {err, sessionId in
                     // TODO: handle error
                     (err != nil) ? p(Result.success("")) : p(Result.success(sessionId!))
                 }
             }
         }
-    
+
     /// The public property for connectivty will be a simplified model based on callbacks from delegate
     /// ie. create session is the start of connectivty and then merge in the subsequent reconnection callbacks
     ///
-    lazy var vonageConnectionState = vonageReconnections.prepend(.success(false))
+    lazy var vonageConnectionState = self.vonage.vonageReconnections.prepend(.success(false))
         .combineLatest(vonageSessionId.eraseToAnyPublisher().catch { _ in Just("")
         })
         .map { (reconnects,sessionId) in
             if (sessionId == "")  {return Connection.disconnected(err: nil)}
-            
+
             switch (reconnects){
             case let .success(flag) where flag == true:
                 return Connection.reconnecting
@@ -146,128 +186,52 @@ class ApplicationCallState: NSObject,VGVoiceClientDelegate {
 
     
     // MARK: Calls
-
-    /// We publish our hangups so we can utilise it as apart of the call state machine
-    ///
-    lazy var localHangups = NotificationCenter.default.publisher(for: ApplicationCallState.CallStateLocalHangupNotification)
-        .map { n  in n.userInfo?["call"] as? VGVoiceCall}
-        .compactMap{ $0 }
-        .flatMap { (call) in
-            Future<Error?,Never>{ p in
-                call.hangup { err in
-                    p(Result.success(err))
-                }
-            }
-            .map { err in
-                (call.callId, err)
-            }
-        }
-        .share()
-    
-    
-    /// Internally we transform actions to make outbound calls into a vonage call object
-    /// Note: Generally all streams with side effects are multicast to only make the request once regardless of subscriber count
-    ///
-    private lazy var __outboundVGCalls =  NotificationCenter.default.publisher(for: ApplicationCallState.CallStateStartOutboundCallNotification)
-        .map { n  in n.userInfo}
-        .flatMap { context in
-            Future{ p in
-                self.vonage.serverCall(context) { err, call in
-                    (err != nil) ? p(Result.failure(err!)) : p(Result.success(call!))
-                }
-            }
-            .map { vgcall in
-                Result<Call,Error>.success(
-                    Call(
-                        id: vgcall.callId,
-                        to: (context?["to"] as? String) ?? "",
-                        status: .ringing,
-                        ref: vgcall
-                    ))
-            }
-            .catch { err in
-                Just(Result<Call,Error>.failure(err))
-            }
-        }
-        .multicast(subject: PassthroughSubject())
-        .autoconnect()
-        .eraseToAnyPublisher()
-    
-//    lazy var outboundErrors = __outboundVGCalls
-//        .map { result -> Error? in result.map {_ in nil}.catch{ $0 } }
-//        .compactMap { $0 }
-    
     
     /// Transform Vonage Calls into our call model
     ///
-    lazy var outbound = __outboundVGCalls
+    lazy var outboundCalls = self.vonage.outboundVGCalls
         .compactMap { try? $0.get()}
-        .map { call in
-            return self.vonageLegStatus
-                .prepend((call.id, call.id, "ringing"))
-                .eraseToAnyPublisher()
-                .merge(with:self.localHangups.map { (call:$0.0, leg:$0.0, status:$0.1 == nil ? "localHangup" : "")} )
-                .filter { $0.call == call.id }
+        .map { (vgcall:VGVoiceCall) -> AnyPublisher<Call,Never> in
+            let call = Call.outbound(id: vgcall.callId, to: "", status: .ringing)
+            return self.vonage.vonageLegStatus
+                .merge(with:self.vonage.localHangups.map { (call:$0.0, leg:$0.0, status:$0.1 == nil ? "localHangup" : "")} )
+                .filter { $0.call == vgcall.callId }
                 .scan(call) { call, update in
-                    Call(call: call, status: call.status.nextState(input: update))
+                    Call(call: call, status: call.nextState(input: update))
                 }
                 .eraseToAnyPublisher()
-
+        }
+    
+    lazy var inboundCalls = self.vonage.vonageInvites
+        .map { invite in
+            let callId = invite.call
+            let call = Call.inbound(id: callId, from: "", status: .ringing)
+            
+            return self.vonage.vonageCallHangup
+                .merge(with: self.vonage.vonageLegStatus)
+                .filter { $0.call == call.id}
+                .scan(call) { call, legStatus in
+                    Call(call: call, status: call.nextState(input: legStatus))
+                }
+                .eraseToAnyPublisher()
         }
     
     /// We keep a map of active calls by reducing over time the published calls
     /// This is a useful property for UI to understand IF we have any current calls at a given moment.
     ///
-    lazy var activeCalls = outbound
-        .flatMap { $0.map { $0 } }
-        .scan(Dictionary<CallId,Call>.init()){ all, call in
-            all.filter { elem in
-                elem.value.status != .completed
-            }
-            .merging([call.id:call], uniquingKeysWith: { (_, new) in new })
-        }
-        .multicast(subject: CurrentValueSubject([:]))
-        .autoconnect()
+//    lazy var activeCalls = outboundCalls.eraseToAnyPublisher()
+////        .merge(with: inboundCalls)
+//        .flatMap { $0.map { $0 } }
+//        .scan(Dictionary<CallId,Call>.init()){ all, call in
+//            all.filter { elem in
+//                elem.value.status != .completed
+//            }
+//            .merging([call.id:call], uniquingKeysWith: { (_, new) in new })
+//        }
+//        .multicast(subject: CurrentValueSubject([:]))
+//        .autoconnect()
 
-       
-    
-    // MARK: INIT
-    
-    init(from appState:ApplicationState, and vonageClient:VGVoiceClient){
-        self.vonage = vonageClient
-        self.appState = appState
-        super.init()
-        vonageClient.delegate = self
-    }
-    
-    // MARK: VGVoiceClientDelegate Lifecycle
-    
-    /// Our integration with the vonage client is mainly to transform the client delegate into observables
-    /// for down stream subscribers.
-    ///
-    let vonageReconnections = PassthroughSubject<Result<Bool,Error>, Never>()
-    func clientWillReconnect(_ client: VGBaseClient) {
-        vonageReconnections.send(Result.success(true))
-    }
-    func clientDidReconnect(_ client: VGBaseClient) {
-        vonageReconnections.send(Result.success(false))
-    }
-    func client(_ client: VGBaseClient, didReceiveSessionErrorWith reason: VGSessionErrorReason) {
-        vonageReconnections.send(Result.failure(reason))
-    }
-    
-    func voiceClient(_ client: VGVoiceClient, didReceiveInviteForCall callId: String, with invite: VGVoiceInvite) {
-    }
-    
-    let vonageCallHangup = PassthroughSubject<(String,Bool), Never>()
-    func voiceClient(_ client: VGVoiceClient, didReceiveHangupForCall callId: String, withLegId legId: String, andQuality callQuality: VGRTCQuality) {
-        vonageCallHangup.send((callId,callId == legId))
-    }
-    
-    let vonageLegStatus = PassthroughSubject<(call:CallId,leg:LegId,status:String), Never>()
-    func voiceClient(_ client: VGVoiceClient, didReceiveLegStatusUpdateForCall callId: String, withLegId legId: String, andStatus status: String) {
-        vonageLegStatus.send((callId,legId,status))
-    }
+
 }
 
 // MARK: Call Actions
@@ -278,4 +242,16 @@ extension ApplicationCallState {
     static let CallStateStartOutboundCallNotification = NSNotification.Name("CallStateCreateCallNotification")
     
     static let CallStateLocalHangupNotification = NSNotification.Name("CallStateLocalHangupNotification")
+    
+    static let CallStateLocalRejectNotification = NSNotification.Name("CallStateLocalRejectNotification")
+
+    static let CallStateLocalAnswerNotification = NSNotification.Name("CallStateLocalAnswerNotification")
+
 }
+
+
+// MARK: VonageClientDelegate+Publisher
+
+typealias CallActionResult = (call:CallId, err:Error?)
+
+

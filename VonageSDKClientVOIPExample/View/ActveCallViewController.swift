@@ -11,24 +11,16 @@ import Combine
 
 
 class ActiveCallViewModel: ObservableObject {
-    @Published var call: Call
-    @Published var activeCalls: Dictionary<CallId,Call> = [:]
+    @Published var call: Call = Call.inbound(id: "", from: "", status: .ringing)
 
     private var cancellables = Set<AnyCancellable>()
     
-    init(for call:Call, all_calls:some Publisher<Dictionary<CallId,Call>, Never>){
-        self.call = call
-        
-        all_calls
-            .assign(to: \.activeCalls, on:self)
+    init(for call:some Publisher<Call, Never>){
+        call
+            .receive(on: RunLoop.main)
+            .assign(to: \.call, on:self)
             .store(in: &self.cancellables)
         
-        // keep call updated
-        all_calls
-            .map { m in m[self.call.id]}
-            .compactMap { $0 }
-            .assign(to: \.call, on:self)
-            .store(in: &cancellables)
     }
 }
 
@@ -38,7 +30,7 @@ class ActiveCallViewController: UIViewController {
     var callStatusVisual: UIView!
     var callStatusVisualTop: UIView!
 
-
+    var answerButton: UIButton!
     var hangupButton: UIButton!
     var muteButton: UIButton!
     var cancels = Set<AnyCancellable>()
@@ -61,11 +53,19 @@ class ActiveCallViewController: UIViewController {
         self.callStatusVisual.layer.removeAnimation(forKey: "ringing")
         self.callStatusVisual.layer.removeAnimation(forKey: "answer")
         self.callStatusVisualTop.layer.removeAnimation(forKey: "rejected")
-        
-        viewModel.$call.map { $0.to }.sink(receiveValue: { s in
-            self.calleeLabel.text = s
-        })
-        .store(in: &cancels)
+//
+//        viewModel.$call.map {
+//            switch ($0) {
+//            case .outbound(_,let to, _):
+//                return to
+//            case .inbound(_,let from):
+//                return from
+//            }
+//        }
+//        .sink(receiveValue: { (s:String) in
+//            self.calleeLabel.text = s
+//        })
+//        .store(in: &cancels)
         
         viewModel.$call
             .map { $0.status }
@@ -150,7 +150,6 @@ class ActiveCallViewController: UIViewController {
         callStatusVisualParent.addSubview(callStatusVisualTop)
         callStatusVisualParent.addSubview(callStatusLabel)
 
-        
         let callStatusVisualSize = 250.0
 //
         let callVisualConstraints = [
@@ -167,6 +166,12 @@ class ActiveCallViewController: UIViewController {
             callStatusLabel.centerXAnchor.constraint(equalTo: callStatusVisualParent.centerXAnchor),
             callStatusLabel.centerYAnchor.constraint(equalTo: callStatusVisualParent.centerYAnchor)
         ]
+        
+        answerButton = UIButton()
+        answerButton.translatesAutoresizingMaskIntoConstraints = false
+        answerButton.setTitle("X", for: .normal)
+        answerButton.backgroundColor = .systemRed
+        answerButton.addTarget(self, action: #selector(hangupButtonPressed), for: .touchUpInside)
         
         hangupButton = UIButton()
         hangupButton.translatesAutoresizingMaskIntoConstraints = false
@@ -214,21 +219,27 @@ class ActiveCallViewController: UIViewController {
             stackView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 50),
             stackView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -25)
         ])
-
-        
-    }
-    
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        
-        // Set once we know layout sizing
-//        callStatusVisual.layer.cornerRadius = callStatusVisual.bounds.size.width * 0.5
-//        callStatusVisual.subviews[0].layer.cornerRadius =  callStatusVisual.bounds.size.width * 0.85 * 0.5
-//        callStatusVisualInner2.layer.cornerRadius =  callStatusVisual.bounds.size.width * 0.65 * 0.5
     }
     
     @objc func hangupButtonPressed(_ sender:UIButton) {
-        NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalHangupNotification, object:nil, userInfo: ["call": viewModel?.call.ref as Any])
+        guard let call = viewModel?.call else {
+            return
+        }
+        NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalHangupNotification, object:nil, userInfo: ["callId": call.id ])
+    }
+    
+    @objc func answerButtonPressed(_ sender:UIButton) {
+        guard let call = viewModel?.call else {
+            return
+        }
+        NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalAnswerNotification, object:nil, userInfo: ["callId": call.id ])
+    }
+    
+    @objc func rejectedButtonPressed(_ sender:UIButton) {
+        guard let call = viewModel?.call else {
+            return
+        }
+        NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalRejectNotification, object:nil, userInfo: ["callId": call.id ])
     }
 }
 
