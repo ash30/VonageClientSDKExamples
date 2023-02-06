@@ -172,17 +172,16 @@ class ApplicationCallState: NSObject {
         .multicast(subject: CurrentValueSubject<Connection,Never>(.unknown))
         .autoconnect()
     
-    //
-//    lazy var isRegisteredForPush = appState.voipToken.combineLatest(appState.deviceToken)
-//        .flatMap { (token1, token2) in
-//            Future<String,Error>{ p in
-//                self.vonage.registerDevicePushToken(token1, userNotificationToken: token2) { err, id in
-//                    (err != nil) ? p(Result.failure(err!)) : p(Result.success(id!))
-//                }
-//            }
-//        }
-//        .map { _ in true }
-//        .multicast(subject: CurrentValueSubject<Bool,Never>(false))
+    lazy var isRegisteredForPush = appState.voipToken.combineLatest(appState.deviceToken)
+        .flatMap { (token1, token2) in
+            Future<Bool,Error>{ p in
+                self.vonage.client.registerDevicePushToken(token1, userNotificationToken: token2) { err, id in
+                    (err != nil) ? p(Result.failure(err!)) : p(Result.success(true))
+                }
+            }
+            .catch { _ in return Just(false) }
+        }
+        .multicast(subject: CurrentValueSubject<Bool,Never>(false))
 
     
     // MARK: Calls
@@ -199,6 +198,7 @@ class ApplicationCallState: NSObject {
                 .scan(call) { call, update in
                     Call(call: call, status: call.nextState(input: update))
                 }
+                .prepend(call)
                 .eraseToAnyPublisher()
         }
     
@@ -213,6 +213,7 @@ class ApplicationCallState: NSObject {
                 .scan(call) { call, legStatus in
                     Call(call: call, status: call.nextState(input: legStatus))
                 }
+                .prepend(call)
                 .eraseToAnyPublisher()
         }
     

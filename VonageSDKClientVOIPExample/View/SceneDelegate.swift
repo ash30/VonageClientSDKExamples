@@ -36,6 +36,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 }
                 else {
                     self.window?.rootViewController = self.nav
+                    self.nav.pushViewController(activeCallVC, animated: true)
+                    activeCallVC.viewModel = ActiveCallViewModel(for: Just(Call.outbound(id: "", to: "", status: .ringing)))
                 }
             }
             .store(in: &cancellables)
@@ -51,10 +53,15 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 guard user != nil else {
                     return 
                 }
+                
+                // TODO
                 if (self.nav.topViewController != activeCallVC) {
-                    activeCallVC.viewModel = ActiveCallViewModel(for:newCall.print("foo1a"))
                     self.nav.pushViewController(activeCallVC, animated: true)
+                    newCall.first().sink { call in
+                        activeCallVC.viewModel = ActiveCallViewModel(for: Just(call).merge(with: newCall))
+                    }.store(in: &self.cancellables)
                 }
+
             }
             .store(in: &cancellables)
         self.window?.makeKeyAndVisible()

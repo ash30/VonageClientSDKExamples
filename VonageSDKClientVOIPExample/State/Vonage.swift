@@ -20,8 +20,12 @@ class VonageClientState: NSObject, VGVoiceClientDelegate {
         super.init()
         vonageClient.delegate = self
         
+        // Refactor please
         self.activeInvites.sink(receiveValue: {_ in}).store(in: &cancellables)
         self.activeVGCalls.sink(receiveValue: {_ in}).store(in: &cancellables)
+        self.answeredInvites.sink(receiveValue: {_ in}).store(in: &cancellables)
+        self.RejectedInvites.sink(receiveValue: {_ in}).store(in: &cancellables)
+        self.localHangups.sink(receiveValue: {_ in}).store(in: &cancellables)
     }
     
     /// # Basic Publishers

@@ -11,7 +11,7 @@ import Combine
 
 
 class ActiveCallViewModel: ObservableObject {
-    @Published var call: Call = Call.inbound(id: "", from: "", status: .ringing)
+    @Published var call: Call = Call.inbound(id: "", from: "", status: .unknown)
 
     private var cancellables = Set<AnyCancellable>()
     
@@ -31,8 +31,14 @@ class ActiveCallViewController: UIViewController {
     var callStatusVisualTop: UIView!
 
     var answerButton: UIButton!
+    var rejectButton: UIButton!
     var hangupButton: UIButton!
     var muteButton: UIButton!
+    
+    var inboundCallControls: UIView!
+    var activeCallControls: UIView!
+    var callControlRoot: UIStackView!
+    
     var cancels = Set<AnyCancellable>()
 
     var viewModel:ActiveCallViewModel? {
@@ -66,6 +72,29 @@ class ActiveCallViewController: UIViewController {
 //            self.calleeLabel.text = s
 //        })
 //        .store(in: &cancels)
+        
+        viewModel.$call
+            .sink(receiveValue: { call in
+                switch (call) {
+                case .inbound(_,_, let status):
+                    switch(status) {
+                    case .ringing:
+                        self.activeCallControls.removeFromSuperview()
+                        self.callControlRoot.addArrangedSubview(self.inboundCallControls)
+                    case .answered:
+                        self.inboundCallControls.removeFromSuperview()
+                        self.callControlRoot.addArrangedSubview(self.activeCallControls)
+                    default:
+                        return
+                    }
+                case .outbound:
+                    self.inboundCallControls.removeFromSuperview()
+                    self.callControlRoot.addArrangedSubview(self.activeCallControls)
+                }
+            })
+            .store(in: &cancels)
+
+        
         
         viewModel.$call
             .map { $0.status }
@@ -170,10 +199,18 @@ class ActiveCallViewController: UIViewController {
         answerButton = UIButton()
         answerButton.translatesAutoresizingMaskIntoConstraints = false
         answerButton.setTitle("X", for: .normal)
-        answerButton.backgroundColor = .systemRed
-        answerButton.addTarget(self, action: #selector(hangupButtonPressed), for: .touchUpInside)
+        answerButton.backgroundColor = .green
+        answerButton.addTarget(self, action: #selector(answerButtonPressed), for: .touchUpInside)
+        
+        rejectButton = UIButton()
+        rejectButton.translatesAutoresizingMaskIntoConstraints = false
+        rejectButton.setTitle("X", for: .normal)
+        rejectButton.backgroundColor = .systemRed
+        rejectButton.addTarget(self, action: #selector(rejectedButtonPressed), for: .touchUpInside)
         
         hangupButton = UIButton()
+        hangupButton.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
+        hangupButton.setContentHuggingPriority(.defaultHigh, for: .horizontal)
         hangupButton.translatesAutoresizingMaskIntoConstraints = false
         hangupButton.setTitle("X", for: .normal)
         hangupButton.backgroundColor = .systemRed
@@ -185,12 +222,32 @@ class ActiveCallViewController: UIViewController {
         muteButton.setTitle("X", for: .normal)
         muteButton.addTarget(self, action: #selector(hangupButtonPressed), for: .touchUpInside)
         
-        let callControlStack = UIStackView()
-        callControlStack.axis = .horizontal
-        callControlStack.distribution = .equalCentering
-        callControlStack.alignment = .center
-        callControlStack.addArrangedSubview(muteButton)
-        callControlStack.addArrangedSubview(hangupButton)
+        let inboundCallControlStack = UIStackView()
+        inboundCallControls = inboundCallControlStack
+        inboundCallControls.translatesAutoresizingMaskIntoConstraints = false
+        inboundCallControlStack.axis = .horizontal
+        inboundCallControlStack.distribution = .equalCentering
+        inboundCallControlStack.alignment = .center
+        inboundCallControlStack.addArrangedSubview(answerButton)
+        inboundCallControlStack.addArrangedSubview(rejectButton)
+
+        let activeCallControlStack = UIStackView()
+        activeCallControls = activeCallControlStack
+        activeCallControls.translatesAutoresizingMaskIntoConstraints = false
+        activeCallControlStack.axis = .horizontal
+        activeCallControlStack.distribution = .equalCentering
+        activeCallControlStack.alignment = .center
+        activeCallControlStack.addArrangedSubview(UIView())
+        activeCallControlStack.addArrangedSubview(hangupButton)
+        activeCallControlStack.addArrangedSubview(UIView())
+        
+        let callControlRoot = UIStackView()
+        self.callControlRoot = callControlRoot
+        callControlRoot.translatesAutoresizingMaskIntoConstraints = false
+        callControlRoot.axis = .vertical
+        callControlRoot.distribution = .equalCentering
+        callControlRoot.alignment = .fill
+
 
         let callControlButtonSize = 75.0
         let callControlConstraints = [
@@ -198,11 +255,19 @@ class ActiveCallViewController: UIViewController {
             hangupButton.widthAnchor.constraint(equalToConstant: callControlButtonSize),
             muteButton.heightAnchor.constraint(equalToConstant: callControlButtonSize),
             muteButton.widthAnchor.constraint(equalToConstant: callControlButtonSize),
+            answerButton.heightAnchor.constraint(equalToConstant: callControlButtonSize),
+            answerButton.widthAnchor.constraint(equalToConstant: callControlButtonSize),
+            rejectButton.heightAnchor.constraint(equalToConstant: callControlButtonSize),
+            rejectButton.widthAnchor.constraint(equalToConstant: callControlButtonSize),
+            
+            callControlRoot.heightAnchor.constraint(greaterThanOrEqualToConstant: callControlButtonSize),
         ]
         
         muteButton.layer.cornerRadius = callControlButtonSize * 0.5
         hangupButton.layer.cornerRadius = callControlButtonSize * 0.5
-        
+        rejectButton.layer.cornerRadius = callControlButtonSize * 0.5
+        answerButton.layer.cornerRadius = callControlButtonSize * 0.5
+
         let stackView = UIStackView()
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.axis = .vertical
@@ -210,7 +275,7 @@ class ActiveCallViewController: UIViewController {
         stackView.alignment = .fill
         stackView.addArrangedSubview(calleeLabel)
         stackView.addArrangedSubview(callStatusVisualParent)
-        stackView.addArrangedSubview(callControlStack)
+        stackView.addArrangedSubview(callControlRoot)
         view.addSubview(stackView)
         
         NSLayoutConstraint.activate(callVisualConstraints + callControlConstraints + [
@@ -225,6 +290,8 @@ class ActiveCallViewController: UIViewController {
         guard let call = viewModel?.call else {
             return
         }
+        self.hangupButton.layer.add(ActiveCallViewController.ButtonPressedAnimation, forKey: "press")
+        
         NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalHangupNotification, object:nil, userInfo: ["callId": call.id ])
     }
     
@@ -232,6 +299,8 @@ class ActiveCallViewController: UIViewController {
         guard let call = viewModel?.call else {
             return
         }
+        self.answerButton.layer.add(ActiveCallViewController.ButtonPressedAnimation, forKey: "press")
+        
         NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalAnswerNotification, object:nil, userInfo: ["callId": call.id ])
     }
     
@@ -239,6 +308,8 @@ class ActiveCallViewController: UIViewController {
         guard let call = viewModel?.call else {
             return
         }
+        self.rejectButton.layer.add(ActiveCallViewController.ButtonPressedAnimation, forKey: "press")
+        
         NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalRejectNotification, object:nil, userInfo: ["callId": call.id ])
     }
 }
@@ -367,5 +438,27 @@ fileprivate extension ActiveCallViewController{
         return group
     }()
     
-    
+    static let ButtonPressedAnimation: CAAnimation = { () -> CAAnimation in
+        var anim = [CAAnimation]()
+
+        let transformAnim = CAKeyframeAnimation(keyPath: "transform.scale")
+        transformAnim.duration = 0.2
+        transformAnim.repeatCount = 1
+        transformAnim.values = [1.0, 1.05, 1.0]
+        transformAnim.keyTimes = [0, 0.333, 1]
+        transformAnim.timingFunctions = [
+            CAMediaTimingFunction(name: CAMediaTimingFunctionName.easeOut),
+            CAMediaTimingFunction(name: CAMediaTimingFunctionName.easeOut)
+        ]
+        anim.append(transformAnim)
+        
+        let group = CAAnimationGroup()
+        group.animations = anim
+        group.duration = 0.5
+        group.repeatCount = 1
+        
+        return group
+    }()
 }
+
+
