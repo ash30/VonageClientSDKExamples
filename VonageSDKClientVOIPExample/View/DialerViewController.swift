@@ -10,12 +10,12 @@ import Combine
 
 class DialerViewModel: ObservableObject{
     @Published var number: String = ""
-    @Published var connection: Connection = .unknown
+    @Published var connection: Connection = .disconnected(err: nil)
     private var cancellables = Set<AnyCancellable>()
     
     init(from callState:ApplicationCallState){
         callState
-            .vonageConnectionState
+            .connectivity
             .assign(to: \.connection, on:self).store(in: &self.cancellables)
     }
 }
@@ -183,9 +183,9 @@ class DialerViewController: UIViewController {
                 case .connected:
                     return UIColor.systemGreen
                 case .reconnecting:
-                    return UIColor.orange
+                    return UIColor.red
                 default:
-                    return UIColor.systemRed
+                    return UIColor.orange
                 }
             })
             .receive(on: RunLoop.main)

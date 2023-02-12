@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		04BC063F8913B68CBD5AD164 /* Pods_VonageSDKClientVOIPExample.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9787D52D08CB941D75FB3450 /* Pods_VonageSDKClientVOIPExample.framework */; };
 		D12159232990502D001BB563 /* Vonage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12159222990502D001BB563 /* Vonage.swift */; };
+		D12159252991AF6D001BB563 /* AppDelegate+Startup.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12159242991AF6D001BB563 /* AppDelegate+Startup.swift */; };
 		D1F243732981846C00C49B3F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F243722981846C00C49B3F /* AppDelegate.swift */; };
 		D1F243752981846C00C49B3F /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F243742981846C00C49B3F /* SceneDelegate.swift */; };
 		D1F243772981846C00C49B3F /* DialerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F243762981846C00C49B3F /* DialerViewController.swift */; };
@@ -27,6 +28,7 @@
 		6A29EF2241B7D3E5BF694A36 /* Pods-VonageSDKClientVOIPExample.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-VonageSDKClientVOIPExample.release.xcconfig"; path = "Target Support Files/Pods-VonageSDKClientVOIPExample/Pods-VonageSDKClientVOIPExample.release.xcconfig"; sourceTree = "<group>"; };
 		9787D52D08CB941D75FB3450 /* Pods_VonageSDKClientVOIPExample.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_VonageSDKClientVOIPExample.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D12159222990502D001BB563 /* Vonage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Vonage.swift; sourceTree = "<group>"; };
+		D12159242991AF6D001BB563 /* AppDelegate+Startup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+Startup.swift"; sourceTree = "<group>"; };
 		D1F2436F2981846C00C49B3F /* VonageSDKClientVOIPExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VonageSDKClientVOIPExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D1F243722981846C00C49B3F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D1F243742981846C00C49B3F /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -89,6 +91,7 @@
 				D1F24390298B0D4200C49B3F /* State */,
 				D1F2438D298553B800C49B3F /* VonageSDKClientVOIPExample.entitlements */,
 				D1F243722981846C00C49B3F /* AppDelegate.swift */,
+				D12159242991AF6D001BB563 /* AppDelegate+Startup.swift */,
 				D1F2437B2981846E00C49B3F /* Assets.xcassets */,
 				D1F2437D2981846E00C49B3F /* LaunchScreen.storyboard */,
 				D1F243802981846E00C49B3F /* Info.plist */,
@@ -250,6 +253,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D12159232990502D001BB563 /* Vonage.swift in Sources */,
+				D12159252991AF6D001BB563 /* AppDelegate+Startup.swift in Sources */,
 				D1F2438F2987370B00C49B3F /* ActveCallViewController.swift in Sources */,
 				D1F24395298B0E1200C49B3F /* Call.swift in Sources */,
 				D1F24393298B0DB200C49B3F /* Application.swift in Sources */,
@@ -402,6 +406,7 @@
 				DEVELOPMENT_TEAM = 7F2B5ZSP8Q;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = VonageSDKClientVOIPExample/Info.plist;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Need microphone access for uploading audio";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = "";
@@ -412,7 +417,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.nexmo.VonageSDKClient.VOIPExample;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.nexmo.nexmoclient-push-notifications-test-app-ios";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -432,6 +437,7 @@
 				DEVELOPMENT_TEAM = 7F2B5ZSP8Q;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = VonageSDKClientVOIPExample/Info.plist;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Need microphone access for uploading audio";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = "";
@@ -442,7 +448,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.nexmo.VonageSDKClient.VOIPExample;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.nexmo.nexmoclient-push-notifications-test-app-ios";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

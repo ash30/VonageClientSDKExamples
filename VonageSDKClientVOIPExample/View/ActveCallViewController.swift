@@ -11,7 +11,7 @@ import Combine
 
 
 class ActiveCallViewModel: ObservableObject {
-    @Published var call: Call = Call.inbound(id: "", from: "", status: .unknown)
+    @Published var call: Call = Call.inbound(id: UUID(), from: "", status: .unknown)
 
     private var cancellables = Set<AnyCancellable>()
     
@@ -301,7 +301,7 @@ class ActiveCallViewController: UIViewController {
         }
         self.answerButton.layer.add(ActiveCallViewController.ButtonPressedAnimation, forKey: "press")
         
-        NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalAnswerNotification, object:nil, userInfo: ["callId": call.id ])
+        NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalAnswerNotification, object:nil, userInfo: ["callId": call.id])
     }
     
     @objc func rejectedButtonPressed(_ sender:UIButton) {

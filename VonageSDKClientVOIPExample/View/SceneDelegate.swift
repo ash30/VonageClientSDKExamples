@@ -36,8 +36,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                 }
                 else {
                     self.window?.rootViewController = self.nav
-                    self.nav.pushViewController(activeCallVC, animated: true)
-                    activeCallVC.viewModel = ActiveCallViewModel(for: Just(Call.outbound(id: "", to: "", status: .ringing)))
                 }
             }
             .store(in: &cancellables)

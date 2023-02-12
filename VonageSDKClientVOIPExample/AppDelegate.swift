@@ -8,6 +8,7 @@
 import UIKit
 import VonageClientSDKVoice
 import CallKit
+import Combine
 
 
 // We should add this to sdk
@@ -17,19 +18,31 @@ extension VGSessionErrorReason: Error {}
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
+    // Services
     public var identity: UserIdentityManager!
+    public var cpaas: VGVoiceClient!
+    
+    // State
     public var applicationState: ApplicationState!
     public var appplicationCallState: ApplicationCallState!
+    public var applicationCPAASState: VonageClientState!
+    
+    var cancellables = Set<AnyCancellable>()
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Create Application Object Graph
         VGBaseClient.setDefaultLoggingLevel(.verbose)
-        let vonage = VGVoiceClient()
-        vonage.setConfig(.init(region: .US))
-        
+        cpaas = VGVoiceClient()
+        cpaas.setConfig(.init(region: .US))
         identity = DemoIdentityManager()
-        applicationState = ApplicationState(vonageClient: vonage, identity: identity)
-        appplicationCallState = ApplicationCallState(from: applicationState, and: vonage)
+        applicationState = ApplicationState(vonageClient: cpaas, identity: identity)
+        applicationCPAASState = VonageClientState(vonageClient: cpaas, applicationState: applicationState)
+        appplicationCallState = ApplicationCallState(from: applicationState, and: applicationCPAASState)
+
+        
+        start()
+        NSLog("Starting123")
+        
         return true
     }
 
@@ -46,6 +59,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // If any sessions were discarded while the application was not running, this will be called shortly after application:didFinishLaunchingWithOptions.
         // Use this method to release any resources that were specific to the discarded scenes, as they will not return.
     }
+    
+    // MARK: Notifications
     
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         NotificationCenter.default.post(name: NSNotification.didRegisterForRemoteNotificationNotification, object: nil, userInfo: ["data":deviceToken])

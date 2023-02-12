@@ -10,6 +10,7 @@ import Combine
 import PushKit
 import UIKit
 import VonageClientSDKVoice
+import CallKit
 
 
 // MARK: Application Models
@@ -18,40 +19,46 @@ import VonageClientSDKVoice
 /// Its assumed applications intergrating the Client SDK will have this define already
 
 enum Connection {
-    case unknown
     case connected
+    case error(err:Error?)
     case reconnecting
     case disconnected(err:Error?)
 }
 
-struct User {
+struct User: Hashable {
     let info: UserDetails
     let token: String
 }
 
+
+enum ApplicationErrors: Error {
+    case PushNotRegistered
+    case Unauthorised
+    case unknown
+}
 // MARK: Application State
 
 class ApplicationState: NSObject, UserIdentityDelegate, PKPushRegistryDelegate {
 
-    // private deps
     private let identity: UserIdentityManager
+    private let vonage: VGVoiceClient
     private let voipRegistry = PKPushRegistry(queue: nil)
+    private var cancellables = Set<AnyCancellable>()
 
     // public
     lazy var user = CurrentValueSubject<User?, Never>(nil)
     
-    lazy var vonageServiceToken = user
-        .compactMap { $0 }
-        .combineLatest(
-            NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification).map { _ in true }.prepend(true)
-        )
-        .flatMap { (u:User,_) in
+    lazy var vonageServiceToken = self.user
+        .flatMap { user in
             Future<String,Error>{ p in
-                self.identity.getServiceToken(name: u.token) { token in
-                    p(Result.success(token))
-                }
-            }
+                user.map { u in
+                    self.identity.getServiceToken(name: u.token) { token in
+                        p(Result.success(token))
+                    }
+                } ?? p(Result.failure(ApplicationErrors.Unauthorised))
+            }.eraseToAnyPublisher()
         }
+        .first()
     
     let deviceToken = Deferred {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
@@ -84,6 +91,7 @@ class ApplicationState: NSObject, UserIdentityDelegate, PKPushRegistryDelegate {
 
     init(vonageClient: VGVoiceClient, identity: UserIdentityManager) {
         self.identity = identity
+        self.vonage = vonageClient
         super.init()
         self.identity.delgate = self
     }
@@ -96,13 +104,30 @@ class ApplicationState: NSObject, UserIdentityDelegate, PKPushRegistryDelegate {
         }
     }
     
+    let voipPush = PassthroughSubject<PKPushPayload,Never>()
+    func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
+            
+        switch (type){
+        case .voIP:
+            voipPush.send(payload)
+        default:
+            return
+        }
+        completion()
+    }
+    
     // MARK: UserIdentityDelegate
     func userAuthorised(userToken: String, userData: UserDetails) {
         let user = User(info: userData, token: userToken)
         self.user.send(user)
     }
 
+    private let userDidAuthRevoked = PassthroughSubject<Bool,Never>()
     func userAuthRevoked() {
         self.user.send(nil)
     }
+    
+    
+
+    
 }

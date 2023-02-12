@@ -8,14 +8,13 @@
 import Foundation
 import Combine
 import VonageClientSDKVoice
+import CallKit
 
 
 // MARK: Call Model
 
 /// Some aliases for convenience
 ///
-typealias CallId = String
-typealias LegId = String
 let VonageLegStatusRinging = "ringing"
 let VonageLegStatusAnswered = "answered"
 let VonageLegStatusCompleted = "completed"
@@ -35,8 +34,8 @@ enum CallState {
 }
 
 enum OneToOneCall {
-    case inbound(id:String, from:String, status:CallState)
-    case outbound(id:String, to:String, status:CallState)
+    case inbound(id:UUID, from:String, status:CallState)
+    case outbound(id:UUID, to:String, status:CallState)
     
     init(call:Self, status: CallState){
         switch (call){
@@ -57,7 +56,7 @@ enum OneToOneCall {
         }
     }
     
-    var id: CallId {
+    var id: UUID {
         get {
             switch(self) {
             case .outbound(let callId,_,_):
@@ -70,7 +69,7 @@ enum OneToOneCall {
     
     /// The input to transition our state machine will be the callbacks provided by the ClientSDK Delegate
     ///
-    func nextState(input:(call:CallId,leg:LegId,status:String)) -> CallState {
+    func nextState(input:(call:UUID,leg:UUID,status:String)) -> CallState {
         switch(self){
         case .inbound:
             return nextStateInbound(input:input)
@@ -79,7 +78,7 @@ enum OneToOneCall {
         }
     }
     
-    private func nextStateOutbound(input:(call:CallId,leg:LegId,status:String)) -> CallState {
+    private func nextStateOutbound(input:(call:UUID,leg:UUID,status:String)) -> CallState {
         switch (self.status) {
         case .ringing where (input.call != input.leg && input.status == VonageLegStatusAnswered):
             return .answered
@@ -95,7 +94,7 @@ enum OneToOneCall {
         }
     }
     
-    private func nextStateInbound(input:(call:CallId,leg:LegId,status:String)) -> CallState {
+    private func nextStateInbound(input:(call:UUID,leg:UUID,status:String)) -> CallState {
         switch (self.status) {
         case .ringing where input.call == input.leg && input.status == VonageLegStatusAnswered:
             return .answered
@@ -123,66 +122,99 @@ typealias Call = OneToOneCall
 /// so the rest of the application can understand what to display
 ///
 class ApplicationCallState: NSObject {
-        
+    
+    // private deps
+    lazy var callProvider = { () -> CXProvider in
+        let provider = CXProvider(configuration: CXProviderConfiguration())
+        provider.setDelegate(self, queue: nil)
+        return provider
+    }()
+    
+    lazy var callController = CXCallController()
+    
     private let vonage: VonageClientState
     private let appState: ApplicationState
     
+    var cancellables = Set<AnyCancellable>()
 
     // MARK: INIT
     
-    init(from appState:ApplicationState, and vonageClient:VGVoiceClient){
-        self.vonage = VonageClientState(vonageClient: vonageClient)
+    init(from appState:ApplicationState, and cpaasState:VonageClientState){
+        self.vonage = cpaasState
         self.appState = appState
         super.init()
+                
+        // Make the following streams hot
+        connectivity.sink{ _ in }.store(in: &cancellables)
+        
+        // Side effects
+        // Keep Callkit in sync with whats going on
+        newCXCallUpdates.sink { update in
+            self.callProvider.reportNewIncomingCall(with: update.0, update: update.1) { err in
+                // What todo with Error??
+            }
+        }
+        .store(in: &self.cancellables)
+        
+        // Need to deduplicate ...
+        localHangups.sink{
+            guard $0.err == nil else {
+                return
+            }
+            let callId = $0.call
+            let action = CXEndCallAction(call:callId)
+            self.callController.request(
+                CXTransaction(action: action),
+                completion: { _ in
+                    NSLog("here")
+                }
+            )
+        }.store(in: &cancellables)
+
     }
     
-    // MARK: Connectivity
-        
-    private lazy var vonageSessionId = appState
-        .vonageServiceToken
-        .flatMap { token in
-            Future<String,Never>{ p in
-                self.vonage.client.createSession(token, sessionId: nil) {err, sessionId in
-                    // TODO: handle error
-                    (err != nil) ? p(Result.success("")) : p(Result.success(sessionId!))
-                }
-            }
-        }
-
-    /// The public property for connectivty will be a simplified model based on callbacks from delegate
-    /// ie. create session is the start of connectivty and then merge in the subsequent reconnection callbacks
+    /// We combine the creation of the session AND the other callbacks for reconnections to provide a unified
+    /// connectivity value for the UI layer
     ///
-    lazy var vonageConnectionState = self.vonage.vonageReconnections.prepend(.success(false))
-        .combineLatest(vonageSessionId.eraseToAnyPublisher().catch { _ in Just("")
-        })
-        .map { (reconnects,sessionId) in
-            if (sessionId == "")  {return Connection.disconnected(err: nil)}
-
-            switch (reconnects){
-            case let .success(flag) where flag == true:
-                return Connection.reconnecting
-            case let .success(flag) where flag == false:
-                return Connection.connected
-            case let .failure(err):
-                return Connection.disconnected(err: err)
-            default:
-                return Connection.unknown
+    lazy var connectivity = vonage.session
+        .combineLatest(self.vonage.pushRegistration)
+        .map { session, p in
+            session.map { _ in p == true ? Connection.connected : Connection.error(err: ApplicationErrors.PushNotRegistered)
             }
         }
-        .multicast(subject: CurrentValueSubject<Connection,Never>(.unknown))
+        .map { connection in
+            connection
+                .map { start in
+                    Just(start)
+                        .merge(with:
+                                self.vonage.vonageWillReconnect.map { _ in Connection.reconnecting }
+                        )
+                        .merge(with:
+                                self.vonage.vonagedidReconnect.map { _ in start }
+                        )
+                        .eraseToAnyPublisher()
+                }
+                ?? Just(.disconnected(err: nil)).eraseToAnyPublisher()
+        }
+        .switchToLatest()
+        .multicast(subject: CurrentValueSubject<Connection,Never>(.disconnected(err: nil)))
         .autoconnect()
     
-    lazy var isRegisteredForPush = appState.voipToken.combineLatest(appState.deviceToken)
-        .flatMap { (token1, token2) in
-            Future<Bool,Error>{ p in
-                self.vonage.client.registerDevicePushToken(token1, userNotificationToken: token2) { err, id in
-                    (err != nil) ? p(Result.failure(err!)) : p(Result.success(true))
-                }
-            }
-            .catch { _ in return Just(false) }
+    
+    private lazy var newCXCallUpdates = self.appState.voipPush
+        .flatMap { payload in
+            self.appState.vonageServiceToken.map { token in
+                self.vonage.client
+                    .processCallInvitePushData(payload.dictionaryPayload, token: token)
+                    .map { invite in
+                        let update = CXCallUpdate()
+                        update.localizedCallerName = invite.from
+                        let uuid = invite.callUUID ?? UUID()
+                        return (uuid,update)
+                    }
+                ?? (UUID(),CXCallUpdate())
+            }.catch { _ in Just((UUID(),CXCallUpdate()))}
         }
-        .multicast(subject: CurrentValueSubject<Bool,Never>(false))
-
     
     // MARK: Calls
     
@@ -191,10 +223,10 @@ class ApplicationCallState: NSObject {
     lazy var outboundCalls = self.vonage.outboundVGCalls
         .compactMap { try? $0.get()}
         .map { (vgcall:VGVoiceCall) -> AnyPublisher<Call,Never> in
-            let call = Call.outbound(id: vgcall.callId, to: "", status: .ringing)
+            let call = Call.outbound(id: UUID(uuidString: vgcall.callId)!, to: "", status: .ringing)
             return self.vonage.vonageLegStatus
-                .merge(with:self.vonage.localHangups.map { (call:$0.0, leg:$0.0, status:$0.1 == nil ? "localHangup" : "")} )
-                .filter { $0.call == vgcall.callId }
+                .merge(with:self.localHangups.map { (call:$0.0, leg:$0.0, status:$0.1 == nil ? "localHangup" : "")} )
+                .filter { $0.call == UUID(uuidString: vgcall.callId)! }
                 .scan(call) { call, update in
                     Call(call: call, status: call.nextState(input: update))
                 }
@@ -220,7 +252,7 @@ class ApplicationCallState: NSObject {
     /// We keep a map of active calls by reducing over time the published calls
     /// This is a useful property for UI to understand IF we have any current calls at a given moment.
     ///
-//    lazy var activeCalls = outboundCalls.eraseToAnyPublisher()
+//    lazy var activeCalls = outboundCalls.eraseToA nyPublisher()
 ////        .merge(with: inboundCalls)
 //        .flatMap { $0.map { $0 } }
 //        .scan(Dictionary<CallId,Call>.init()){ all, call in
@@ -233,6 +265,28 @@ class ApplicationCallState: NSObject {
 //        .autoconnect()
 
 
+    // MARK: Events
+    
+    
+    lazy var localHangups = NotificationCenter.default.publisher(for: ApplicationCallState.CallStateLocalHangupNotification)
+        .compactMap { n  in n.userInfo!["callId"] as? UUID}
+        .flatMap{ callId  in
+            self.vonage.activeVGCalls.first().flatMap { calls in 
+                calls[callId].map { call in
+                    Future<CallActionResult,Never>{ p in
+                        call.hangup { err in
+                            p(Result.success((call:callId, err:err)))
+                        }
+                    }
+                    .eraseToAnyPublisher()
+                }
+                ?? Just((call:callId,err:ApplicationErrors.unknown)).eraseToAnyPublisher()
+            }
+        }
+        .eraseToAnyPublisher()
+        .share()
+
+    
 }
 
 // MARK: Call Actions
@@ -248,11 +302,44 @@ extension ApplicationCallState {
 
     static let CallStateLocalAnswerNotification = NSNotification.Name("CallStateLocalAnswerNotification")
 
+    static let CallStateConnectionStart = NSNotification.Name("CallStateConnectionStart")
 }
 
 
 // MARK: VonageClientDelegate+Publisher
 
-typealias CallActionResult = (call:CallId, err:Error?)
+typealias CallActionResult = (call:UUID, err:Error?)
 
 
+// MARK: CXProviderDelegate
+
+extension ApplicationCallState: CXProviderDelegate {
+    
+    func providerDidReset(_ provider: CXProvider) {
+    }
+    
+    func provider(_ provider: CXProvider, perform action: CXAnswerCallAction){
+        self.vonage.answeredInvites
+            .compactMap { try? $0.get() }
+            .map { UUID(uuidString: $0.callId)! }
+            .filter { $0 == action.callUUID }
+            .first()
+            .sink { _ in
+                action.fulfill()
+            }.store(in: &cancellables)
+        
+        NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalAnswerNotification, object:nil, userInfo: ["callId": action.callUUID ])
+        
+    }
+    
+    func provider(_ provider: CXProvider, perform action: CXEndCallAction){
+        NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalHangupNotification, object:nil, userInfo: ["callId": action.callUUID ])
+    }
+    
+    func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession){
+        VGVoiceClient.enableAudio(audioSession)
+    }
+    func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession){
+        VGVoiceClient.disableAudio(audioSession)
+    }
+}
