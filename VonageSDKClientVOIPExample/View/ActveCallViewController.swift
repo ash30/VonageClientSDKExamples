@@ -291,8 +291,7 @@ class ActiveCallViewController: UIViewController {
             return
         }
         self.hangupButton.layer.add(ActiveCallViewController.ButtonPressedAnimation, forKey: "press")
-        
-        NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalHangupNotification, object:nil, userInfo: ["callId": call.id ])
+        ApplicationAction.post(.hangupCall(id: call.id))
     }
     
     @objc func answerButtonPressed(_ sender:UIButton) {
@@ -300,8 +299,7 @@ class ActiveCallViewController: UIViewController {
             return
         }
         self.answerButton.layer.add(ActiveCallViewController.ButtonPressedAnimation, forKey: "press")
-        
-        NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalAnswerNotification, object:nil, userInfo: ["callId": call.id])
+        ApplicationAction.post(.answerInboundCall(id: call.id))
     }
     
     @objc func rejectedButtonPressed(_ sender:UIButton) {
@@ -309,8 +307,7 @@ class ActiveCallViewController: UIViewController {
             return
         }
         self.rejectButton.layer.add(ActiveCallViewController.ButtonPressedAnimation, forKey: "press")
-        
-        NotificationCenter.default.post(name: ApplicationCallState.CallStateLocalRejectNotification, object:nil, userInfo: ["callId": call.id ])
+        ApplicationAction.post(.rejectInboundCall(id: call.id))
     }
 }
 

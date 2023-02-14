@@ -17,53 +17,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         // A new scene was added to the app.
         guard let scene = (scene as? UIWindowScene) else { return }
-        let app = UIApplication.shared.delegate as! AppDelegate
 
         self.window = UIWindow(windowScene: scene)
-        let loginVC = createViewController(LoginViewController.self)
-        let dialerVC = createViewController(DialerViewController.self)
-        let activeCallVC = ActiveCallViewController()
-        self.nav = UINavigationController(rootViewController:dialerVC)
-        nav.navigationItem.setHidesBackButton(true, animated: false)
-        
-
-        app.applicationState.user
-            .receive(on: RunLoop.main)
-            .sink { (user) in
-                if (user == nil) {
-                    self.nav.popToRootViewController(animated: false)
-                    self.window?.rootViewController = loginVC
-                }
-                else {
-                    self.window?.rootViewController = self.nav
-                }
-            }
-            .store(in: &cancellables)
-        
-        
-        app.applicationState.user
-            .combineLatest(
-                app.appplicationCallState.outboundCalls
-                    .merge(with: app.appplicationCallState.inboundCalls)
-            )
-            .receive(on: RunLoop.main)
-            .sink { (user, newCall) in
-                guard user != nil else {
-                    return 
-                }
-                
-                // TODO
-                if (self.nav.topViewController != activeCallVC) {
-                    self.nav.pushViewController(activeCallVC, animated: true)
-                    newCall.first().sink { call in
-                        activeCallVC.viewModel = ActiveCallViewModel(for: Just(call).merge(with: newCall))
-                    }.store(in: &self.cancellables)
-                }
-
-            }
-            .store(in: &cancellables)
+        self.window?.rootViewController = createViewController(LoginViewController.self)
         self.window?.makeKeyAndVisible()
-
+        
+        bind()
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
@@ -93,9 +52,46 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // Use this method to save data, release shared resources, and store enough scene-specific state information
         // to restore the scene back to its current state.
     }
+}
 
+extension SceneDelegate {
     
-
+    func bind() {
+        let app =  UIApplication.shared.delegate as! AppDelegate
+        let state = app.appState
+        
+        state.$user
+            .receive(on: RunLoop.main)
+            .sink { (user) in
+                if (user == nil) {
+                    let loginVC = self.createViewController(LoginViewController.self)
+                    self.window?.rootViewController = loginVC
+                }
+                else {
+                    let dialerVC = self.createViewController(DialerViewController.self)
+                    self.window?.rootViewController = UINavigationController(rootViewController:dialerVC)
+                }
+                
+            }
+            .store(in: &cancellables)
+        
+        state.newCalls
+            .receive(on: RunLoop.main)
+            .sink { newcall in
+                guard state.user != nil else {
+                    return
+                }
+                
+                if (type(of:self.nav.topViewController) != ActiveCallViewController.self) {
+                    let vc = ActiveCallViewController()
+                    self.nav.pushViewController(vc, animated: true)
+                    newcall.first().sink { call in
+                        vc.viewModel = ActiveCallViewModel(for: Just(call).merge(with: newcall))
+                    }.store(in: &self.cancellables)
+                }
+            }
+            .store(in: &cancellables)
+    }
 }
 
 // MARK: Factory
@@ -104,15 +100,18 @@ extension SceneDelegate {
     
     func createViewController(_ vc:UIViewController.Type) -> UIViewController {
         let app = UIApplication.shared.delegate as! AppDelegate
+        let state = app.appState
+        
         switch(vc){
         case is LoginViewController.Type:
             let login = LoginViewController()
-            let loginData = LoginViewModel(identity: app.identity)
+            let loginData = LoginViewModel()
             login.viewModel = loginData
             return login
         case is DialerViewController.Type:
             let dialer = DialerViewController()
-            let dialerData = DialerViewModel(from:app.appplicationCallState)
+            let dialerData = DialerViewModel()
+            dialerData.bind(to: state)
             dialer.viewModel = dialerData
             return dialer
         case is ActiveCallViewController.Type:

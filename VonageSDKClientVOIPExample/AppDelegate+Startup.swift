@@ -13,26 +13,26 @@ extension AppDelegate {
     
     func setupCPAASConnectivity() {
         
-        self.applicationState.user
-            .combineLatest(
-                NotificationCenter.default.publisher(
-                    for: UIApplication.willEnterForegroundNotification
-                ).map { _ in true }.prepend(true)
-            )
-            .filter { user, _ in user != nil }
-            .repeating(attempts: 10){_,n -> AnyPublisher<Void, Never> in
-                Just(())
-                .delay(for: .seconds(10*n), scheduler: RunLoop.main, options: .none)
-                .eraseToAnyPublisher()
-            }
-            .prefix(untilOutputFrom: self.applicationCPAASState.session.dropFirst(1).filter{ $0 != nil })
-            .sink { _ in
-                NotificationCenter.default.post(name: ApplicationCallState.CallStateConnectionStart, object:nil, userInfo:nil)
-            }.store(in: &cancellables)
-        
-        
-        
-        
+//        self.applicationState.user
+//            .combineLatest(
+//                NotificationCenter.default.publisher(
+//                    for: UIApplication.willEnterForegroundNotification
+//                ).map { _ in true }.prepend(true)
+//            )
+//            .filter { user, _ in user != nil }
+//            .repeating(attempts: 10){_,n -> AnyPublisher<Void, Never> in
+//                Just(())
+//                .delay(for: .seconds(10*n), scheduler: RunLoop.main, options: .none)
+//                .eraseToAnyPublisher()
+//            }
+//            .prefix(untilOutputFrom: self.applicationCPAASState.session.dropFirst(1).filter{ $0 != nil })
+//            .sink { _ in
+//                NotificationCenter.default.post(name: ApplicationCallState.CallStateConnectionStart, object:nil, userInfo:nil)
+//            }.store(in: &cancellables)
+//
+//
+//
+//
         // On each application foregound evejt, we restart the CPAAS Connection
         // IFF the application's user is currently authenticated 
 //        self.applicationState.user.filter { $0 != nil }

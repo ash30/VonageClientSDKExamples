@@ -12,37 +12,26 @@ import Combine
 
 
 // We should add this to sdk
-extension VGSessionErrorReason: Error {}
 
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
-
-    // Services
-    public var identity: UserIdentityManager!
-    public var cpaas: VGVoiceClient!
-    
-    // State
-    public var applicationState: ApplicationState!
-    public var appplicationCallState: ApplicationCallState!
-    public var applicationCPAASState: VonageClientState!
-    
-    var cancellables = Set<AnyCancellable>()
+        
+    var controllers: [ApplicationController] = []
+    var appState = ApplicationState()
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Create Application Object Graph
         VGBaseClient.setDefaultLoggingLevel(.verbose)
-        cpaas = VGVoiceClient()
-        cpaas.setConfig(.init(region: .US))
-        identity = DemoIdentityManager()
-        applicationState = ApplicationState(vonageClient: cpaas, identity: identity)
-        applicationCPAASState = VonageClientState(vonageClient: cpaas, applicationState: applicationState)
-        appplicationCallState = ApplicationCallState(from: applicationState, and: applicationCPAASState)
-
+        let vonage = VGVoiceClient()
+        vonage.setConfig(.init(region: .US))
         
-        start()
-        NSLog("Starting123")
-        
+        controllers.append(UserController())
+        controllers.append(PushController())
+        controllers.append(CallController(client: vonage))
+        controllers.append(CallKitController(client: vonage))
+        controllers.forEach { $0.bindToApplicationState(appState)}
+                
         return true
     }
 

@@ -11,15 +11,11 @@ import Combine
 class DialerViewModel: ObservableObject{
     @Published var number: String = ""
     @Published var connection: Connection = .disconnected(err: nil)
-    private var cancellables = Set<AnyCancellable>()
     
-    init(from callState:ApplicationCallState){
-        callState
-            .connectivity
-            .assign(to: \.connection, on:self).store(in: &self.cancellables)
+    func bind(to state:ApplicationState) {
+        state.$connection.assign(to: &self.$connection)
     }
 }
-
 
 
 // MARK: UI
@@ -204,7 +200,9 @@ class DialerViewController: UIViewController {
                 case .connected:
                     self.callButton.isEnabled = true
                     self.callButton.backgroundColor = UIColor.systemGreen
-
+                case .error(.PushNotRegistered):
+                    self.callButton.isEnabled = true
+                    self.callButton.backgroundColor = UIColor.systemGreen
                 default:
                     self.callButton.isEnabled = false
                     self.callButton.backgroundColor = UIColor.systemGray
@@ -224,7 +222,7 @@ class DialerViewController: UIViewController {
     }
     
     @objc func callButtonPressed(_ sender:UIButton) {
-        NotificationCenter.default.post(name: ApplicationCallState.CallStateStartOutboundCallNotification, object:nil, userInfo: ["to":viewModel?.number ?? "unknown"])
+//        NotificationCenter.default.post(name: ApplicationCallState.CallStateStartOutboundCallNotification, object:nil, userInfo: ["to":viewModel?.number ?? "unknown"])
     }
     
     @objc func deleteDigitButtonPressed(_ sender:UIButton) {

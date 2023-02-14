@@ -10,16 +10,9 @@ import UIKit
 
 class LoginViewModel {
     
-    private var identity: UserIdentityManager
-    
     @objc func loginUser(name:String, password:String) {
-        identity.authenticate((name,password)) { _ in  }
+        ApplicationAction.post(.userAuth(uname: name, pword: password))
     }
-    
-    init(identity: UserIdentityManager) {
-        self.identity = identity
-    }
-    
 }
 
 
@@ -73,8 +66,5 @@ class LoginViewController: UIViewController {
     @objc func submitButtonPressed(_ sender:UIButton) {
         viewModel?.loginUser(name: userNameInput.text ?? "", password: passwordInput.text ?? "")
     }
-
-    
-    
 
 }
