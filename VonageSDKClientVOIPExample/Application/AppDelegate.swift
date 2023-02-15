@@ -31,6 +31,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         controllers.append(CallController(client: vonage))
         controllers.append(CallKitController(client: vonage))
         controllers.forEach { $0.bindToApplicationState(appState)}
+        
+        // Once APP is up, initalise Push things once we have a logged in user
+        ApplicationAction.post(.initialisePush)
+        
+        ApplicationAction.post(.userAuth(uname: "", pword: ""))
+
                 
         return true
     }

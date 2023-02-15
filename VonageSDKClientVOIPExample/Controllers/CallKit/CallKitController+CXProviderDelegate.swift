@@ -15,13 +15,13 @@ extension CallKitController: CXProviderDelegate {
     }
     
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction){
-        ApplicationAction.post(.answerInboundCall(id: action.callUUID))
-        action.fulfill()
+        ApplicationAction.post(.answerInboundCall(id: action.callUUID, cxAction: action))
+//        action.fulfill()
     }
     
     func provider(_ provider: CXProvider, perform action: CXEndCallAction){
-        ApplicationAction.post(.hangupCall(id: action.callUUID))
-        action.fulfill()
+        ApplicationAction.post(.hangupCall(id: action.callUUID, cxAction: action))
+//        action.fulfill()
     }
     
     func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession){

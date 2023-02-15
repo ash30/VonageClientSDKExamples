@@ -8,15 +8,16 @@
 import Foundation
 import Combine
 import UIKit
+import CallKit
 
 enum ApplicationAction {
     case initialisePush
     case cpaasConnect
     case userAuth(uname:String,pword:String)
     case newOutboundCall(context:[String:Any])
-    case answerInboundCall(id:UUID)
+    case answerInboundCall(id:UUID, cxAction:CXAnswerCallAction?)
     case rejectInboundCall(id:UUID)
-    case hangupCall(id:UUID)
+    case hangupCall(id:UUID, cxAction:CXEndCallAction?)
 
 }
 

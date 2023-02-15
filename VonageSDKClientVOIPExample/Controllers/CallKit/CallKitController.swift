@@ -36,24 +36,20 @@ class CallKitController: NSObject {
 extension CallKitController: ApplicationController {
     
     func bindToApplicationState(_ state: ApplicationState) {
-        
-        let newVoipCalls = state.voipPush
-            .map { payload in
-                state.vonageToken.flatMap { token in
-                    self.client.processCallInvitePushData(payload.dictionaryPayload, token: token)
-                        .map { invite in
-                            let update = CXCallUpdate()
-                            update.localizedCallerName = invite.from
-                            let uuid = invite.callUUID ?? UUID()
-                            return (uuid,update)
-                        }
-                   
-                }
-                ?? (UUID(),CXCallUpdate())
+        // Report New Calls to 
+        state.newCalls
+            .flatMap {
+                $0.first()
             }
-        
-        newVoipCalls.sink { update in
-            self.callProvider.reportNewIncomingCall(with: update.0, update: update.1) { err in
+            .compactMap {
+                if case let .inbound(id,from,_) = $0 {
+                    let update = CXCallUpdate()
+                    update.localizedCallerName = from
+                    return (id ,update)
+                }; return nil
+            }
+            .sink { (id,update) in
+            self.callProvider.reportNewIncomingCall(with: id, update: update) { err in
                 // What todo with Error?
             }
         }.store(in: &cancellables)

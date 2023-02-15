@@ -36,8 +36,9 @@ extension PushController: ApplicationController {
                 ApplicationAction
                     .publisher
                     .filter { if case .initialisePush = $0 { return true }; return false  }
+
             )
-            .prefix(untilOutputFrom: state.$deviceToken)
+            .first()
             
         pushInit.sink { _ in
                 UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
@@ -60,7 +61,6 @@ extension PushController: ApplicationController {
 
         
         // VOIP
-        
         let voipTokenInit =  ApplicationAction
             .publisher
             .filter { if case .initialisePush = $0 { return true }; return false  }
@@ -73,5 +73,6 @@ extension PushController: ApplicationController {
             .store(in: &self.cancellables)
         
         self.voipToken.map { $0 as Data? }.assign(to: &state.$voipToken)
+        self.newVoipPush.sink { state.voipPush.send($0)}.store(in: &self.cancellables)
     }
 }

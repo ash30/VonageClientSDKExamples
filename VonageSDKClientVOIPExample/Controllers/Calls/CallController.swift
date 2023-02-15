@@ -9,6 +9,7 @@ import Foundation
 import VonageClientSDKVoice
 import Combine
 import UIKit
+import CallKit
 
 typealias Session = String
 typealias CallStream = AnyPublisher<Call,Never>
@@ -127,10 +128,23 @@ extension CallController: ApplicationController {
     
     func setupCallHandlers(_ state:ApplicationState) {
         
-        // MARK: Invites
+        // MARK: VGInvites
         
-        let activeInvites = vonageInvites
+        let pushInvites = state.voipPush
+            .map { payload in
+                state.vonageToken.flatMap { token in
+                    self.client.processCallInvitePushData(payload.dictionaryPayload, token: token)
+                }
+            }
+            .compactMap { $0.map { invite in (id:UUID(uuidString: invite.callId)! ,invite:invite as VGVoiceInvite?)}}
+            .share()
+        
+        let newInvites = vonageInvites
             .map { (id:$0.call, invite:$0.invite as VGVoiceInvite?)}
+            .merge(with: pushInvites)
+            .removeDuplicates(by: { a,b in a.id == b.id })        
+        
+        let activeInvites = newInvites
             .merge(with: self.vonageCallHangup.map { (id: $0.call, invite:nil) })
             .merge(with: self.vonageLegStatus.map { (id: $0.call, invite:nil) })
             .scan(Dictionary<UUID,VGVoiceInvite>()){ all, update in
@@ -144,7 +158,7 @@ extension CallController: ApplicationController {
          
         let answeredInvites = activeInvites.map { invites in
             ApplicationAction.publisher
-                .compactMap { if case let .answerInboundCall(callId) = $0 { return callId }; return nil }
+                .compactMap { if case let .answerInboundCall(callId,_) = $0 { return callId }; return nil }
                 .flatMap { callId in
                     invites[callId].map { invite in
                         Future<VGVoiceCall,CallError>{ p in
@@ -185,7 +199,7 @@ extension CallController: ApplicationController {
             .switchToLatest()
             .share()
         
-        // MARK: Calls
+        // MARK: VGCalls
         
         let outboundCalls = ApplicationAction.publisher
             .compactMap { if case let .newOutboundCall(context) = $0 {return context}; return nil}
@@ -200,6 +214,9 @@ extension CallController: ApplicationController {
             }
             .share()
             .eraseToAnyPublisher()
+        
+        
+        // MARK: APPLICATION Calls
         
         let allNewCalls = answeredInvites
             .merge(with:outboundCalls)
@@ -219,7 +236,7 @@ extension CallController: ApplicationController {
         
         let finishedCalls = currentActiveCalls.map { calls in
             ApplicationAction.publisher
-                .compactMap { if case let .hangupCall(callId) = $0 { return callId }; return nil }
+                .compactMap { if case let .hangupCall(callId,_) = $0 { return callId }; return nil }
                 .flatMap{ callId  in
                     calls[callId].map { call in
                         Future<UUID,CallError>{ p in
@@ -235,6 +252,61 @@ extension CallController: ApplicationController {
         }
             .switchToLatest()
             .share()
+        
+        // We need to keep Callkit in sync with our Call Controller
+        // here we report the result of hangups initiated by callkit UI back to originating CXAction
+        ApplicationAction.publisher
+            .compactMap { if case let .hangupCall(_,cxaction) = $0 { return cxaction }; return nil }
+            .flatMap { (action:CXEndCallAction) in
+                finishedCalls
+                    .filter { result in
+                        switch(result){
+                        case .success(let uuid): return uuid == action.callUUID
+                        case.failure(let err): return (err.id ?? UUID()) == action.callUUID
+                        }
+                    }
+                    .map {
+                        (action, $0.map{ _ in Void()}.mapError{$0 as Error})
+                    }
+                    .merge(with: Just((action, Result<Void,Error>.failure(ApplicationErrors.unknown))).delay(for: 10.0, scheduler: RunLoop.main) )
+                    .first()
+            }
+            .sink { (action,result) in
+                switch (result) {
+                case .success:
+                    action.fulfill()
+                case .failure:
+                    action.fail()
+                }
+            }
+            .store(in: &cancellables)
+        
+        // Same for answers
+        ApplicationAction.publisher
+            .compactMap { if case let .answerInboundCall(_,cxaction) = $0 { return cxaction }; return nil }
+            .flatMap { (action:CXAnswerCallAction) in
+                answeredInvites
+                    .filter { result in
+                        switch(result){
+                        case .success(let call): return (UUID(uuidString: call.callId)!) == action.callUUID
+                        case.failure(let err): return (err.id ?? UUID()) == action.callUUID
+                        }
+                    }
+                    .map {
+                        (action, $0.map{ _ in Void()}.mapError{$0 as Error})
+                    }
+                    .merge(with: Just((action, Result<Void,Error>.failure(ApplicationErrors.unknown))).delay(for: 10.0, scheduler: RunLoop.main) )
+                    .first()
+            }
+            .sink { (action,result) in
+                switch (result) {
+                case .success:
+                    action.fulfill()
+                case .failure:
+                    action.fail()
+                }
+            }
+            .store(in: &cancellables)
         
         let errors = rejectedInvites
             .merge(with: outboundCalls.map { $0.map {_ in ()} })
@@ -268,10 +340,10 @@ extension CallController: ApplicationController {
                     .eraseToAnyPublisher()
             }
         
-        let inboundStreams = self.vonageInvites
-            .map { invite in
-                let callId = invite.call
-                let call = Call.inbound(id: callId, from: "", status: .ringing)
+        let inboundStreams = newInvites
+            .map { new in
+                let callId = new.invite!.callId
+                let call = Call.inbound(id: UUID(uuidString: callId)!, from: "", status: .ringing)
                 
                 return self.vonageCallHangup
                     .merge(with: self.vonageLegStatus)

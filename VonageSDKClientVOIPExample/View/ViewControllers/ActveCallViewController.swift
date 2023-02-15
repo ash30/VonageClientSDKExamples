@@ -290,7 +290,7 @@ class ActiveCallViewController: UIViewController {
             return
         }
         self.hangupButton.layer.add(ActiveCallViewController.ButtonPressedAnimation, forKey: "press")
-        ApplicationAction.post(.hangupCall(id: call.id))
+        ApplicationAction.post(.hangupCall(id: call.id, cxAction: nil))
     }
     
     @objc func answerButtonPressed(_ sender:UIButton) {
@@ -298,7 +298,7 @@ class ActiveCallViewController: UIViewController {
             return
         }
         self.answerButton.layer.add(ActiveCallViewController.ButtonPressedAnimation, forKey: "press")
-        ApplicationAction.post(.answerInboundCall(id: call.id))
+        ApplicationAction.post(.answerInboundCall(id: call.id, cxAction: nil))
     }
     
     @objc func rejectedButtonPressed(_ sender:UIButton) {
