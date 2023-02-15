@@ -23,7 +23,7 @@ class DialerViewModel: ObservableObject{
 class DialerViewController: UIViewController {
     var callButton: UIButton!
     var calleeNumberInput: UILabel!
-    var dialer: UIStackView!
+    var dialer: UIView!
     var dialerButtons: Array<UIButton> = []
     var deleteDigitButton: UIButton!
 
@@ -88,47 +88,11 @@ class DialerViewController: UIViewController {
         callButton.setTitle("Call", for: .normal)
         callButton.addTarget(self, action: #selector(callButtonPressed), for: .touchUpInside)
 
-        dialer = UIStackView()
-        dialer.translatesAutoresizingMaskIntoConstraints = false
-        dialer.axis = .vertical
-        dialer.distribution = .equalCentering
-        dialer.alignment = .fill
-        dialer.spacing = 20;
-        dialer.setContentHuggingPriority( .defaultHigh, for: .vertical)
-        dialer.setContentHuggingPriority( .defaultHigh, for: .horizontal)
-
-        let buttonValues = [
-            [ "1", "2", "3"],
-            [ "4", "5", "6"],
-            [ "7", "8", "9"],
-            [ "*", "0", "#"]
-        ]
-        
-        for r in buttonValues {
-            let row = UIStackView()
-            row.translatesAutoresizingMaskIntoConstraints = false
-            row.axis = .horizontal
-            row.distribution = .equalSpacing
-            row.alignment = .fill
-            row.spacing = 20;
-            dialer.addArrangedSubview(row)
-            for n in r {
-                let b = UIButton()
-                b.setTitle(n, for:.normal)
-                b.backgroundColor = UIColor.black
-                row.addArrangedSubview(b)
-                dialerButtons.append(b)
-                b.addTarget(self, action: #selector(dialButtonPressed), for: .touchUpInside)
-            }
+        let dialer = DialerView()
+        dialer.onClick = {
+            self.viewModel?.number += $0
         }
-        
-        let buttonSize = 75.0
-        let buttonConstraints = dialerButtons.flatMap { button in
-            [
-                button.heightAnchor.constraint(equalToConstant: buttonSize),
-                button.widthAnchor.constraint(equalTo: button.heightAnchor)
-            ]
-        }
+        self.dialer = dialer
 
         // MARK: RootView
         let stackView = UIStackView()
@@ -139,13 +103,13 @@ class DialerViewController: UIViewController {
         stackView.spacing = 40;
         stackView.addArrangedSubview(online)
         stackView.addArrangedSubview(userInputStackView)
-        stackView.addArrangedSubview(UIView()) // spacer
+//        stackView.addArrangedSubview(UIView()) // spacer
 
         stackView.addArrangedSubview(dialer)
         stackView.addArrangedSubview(callButton)
         view.addSubview(stackView)
 
-        NSLayoutConstraint.activate(buttonConstraints + onlineIconConstraints + [
+        NSLayoutConstraint.activate(onlineIconConstraints + [
             stackView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             stackView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.75),
             stackView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
@@ -213,14 +177,6 @@ class DialerViewController: UIViewController {
         .store(in: &cancels)
     }
     
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        for b in dialerButtons {
-            b.layer.cornerRadius = 0.5 * b.bounds.size.width
-            b.clipsToBounds = true
-        }
-    }
-    
     @objc func callButtonPressed(_ sender:UIButton) {
 //        NotificationCenter.default.post(name: ApplicationCallState.CallStateStartOutboundCallNotification, object:nil, userInfo: ["to":viewModel?.number ?? "unknown"])
     }
@@ -228,10 +184,7 @@ class DialerViewController: UIViewController {
     @objc func deleteDigitButtonPressed(_ sender:UIButton) {
         _ = viewModel?.number.popLast()
     }
-    
-    @objc func dialButtonPressed(_ sender:UIButton) {
-        viewModel?.number += (sender.titleLabel?.text ?? "")
-    }
+
 }
 
 
