@@ -136,26 +136,6 @@ class DialerViewController: UIViewController {
             }
         }
         .store(in: &cancels)
-
-        viewModel.$connection
-            .map({ connectionState in
-                switch (connectionState) {
-                case .connected:
-                    return UIColor.systemGreen
-                case .reconnecting:
-                    return UIColor.red
-                default:
-                    return UIColor.orange
-                }
-            })
-            .receive(on: RunLoop.main)
-            .sink { (colour:UIColor) in
-                if (self.onlineIcon.backgroundColor != colour ){
-                    self.onlineIcon.backgroundColor = colour
-                    self.onlineIcon.setNeedsDisplay()
-                }
-        }
-        .store(in: &cancels)
         
         viewModel.$connection
             .receive(on: RunLoop.main)
@@ -164,21 +144,33 @@ class DialerViewController: UIViewController {
                 case .connected:
                     self.callButton.isEnabled = true
                     self.callButton.backgroundColor = UIColor.systemGreen
+                    self.onlineIcon.backgroundColor = UIColor.systemGreen
+                    
+                #if targetEnvironment(simulator)
                 case .error(.PushNotRegistered):
                     self.callButton.isEnabled = true
                     self.callButton.backgroundColor = UIColor.systemGreen
+                    self.onlineIcon.backgroundColor = UIColor.systemGreen
+                #endif
+                    
+                case .reconnecting:
+                    self.callButton.isEnabled = true
+                    self.onlineIcon.backgroundColor = UIColor.systemOrange
+                    
                 default:
                     self.callButton.isEnabled = false
                     self.callButton.backgroundColor = UIColor.systemGray
-
+                    self.onlineIcon.backgroundColor = UIColor.red
 
                 }
+                self.onlineIcon.setNeedsDisplay()
+
         }
         .store(in: &cancels)
     }
     
     @objc func callButtonPressed(_ sender:UIButton) {
-//        NotificationCenter.default.post(name: ApplicationCallState.CallStateStartOutboundCallNotification, object:nil, userInfo: ["to":viewModel?.number ?? "unknown"])
+        ApplicationAction.post(.newOutboundCall(context:  ["to":viewModel?.number ?? "unknown"]))
     }
     
     @objc func deleteDigitButtonPressed(_ sender:UIButton) {

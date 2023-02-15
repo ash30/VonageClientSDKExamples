@@ -30,6 +30,7 @@ class CallController: NSObject {
     init(client:VGVoiceClient){
         self.client = client
         super.init()
+        client.delegate = self
     }
 }
 
@@ -96,7 +97,6 @@ extension CallController: ApplicationController {
         
         // define cpaas connectivity
         let connection = activeSession
-            .print("FOO1a")
             .combineLatest(pushRegistration)
             .map { session, push in
                 session.map { _ in
@@ -119,7 +119,6 @@ extension CallController: ApplicationController {
                 ?? Just(.disconnected(err: nil)).eraseToAnyPublisher()
             }
             .switchToLatest()
-            .print("FOO1b")
 
         
         connection.assign(to:&state.$connection)
@@ -140,51 +139,51 @@ extension CallController: ApplicationController {
                 else { new[update.0] = update.invite }
                 return new
             }
+            .multicast(subject:CurrentValueSubject<[UUID:VGVoiceInvite],Never>([:]))
+            .autoconnect()
+         
+        let answeredInvites = activeInvites.map { invites in
+            ApplicationAction.publisher
+                .compactMap { if case let .answerInboundCall(callId) = $0 { return callId }; return nil }
+                .flatMap { callId in
+                    invites[callId].map { invite in
+                        Future<VGVoiceCall,CallError>{ p in
+                            invite.answer { err, call in
+                                p(err != nil ? Result.failure(CallError(id: callId, err: err)) : Result.success(call!))
+                            }
+                        }
+                        .asResult()
+                        .eraseToAnyPublisher()
+                    } ?? Just(
+                        Result<VGVoiceCall,CallError>.failure(
+                            CallError(id: callId, err:ApplicationErrors.unknown)
+                        )
+                    ).eraseToAnyPublisher()
+                }
+        }
+            .switchToLatest()
             .share()
         
-        let answeredInvites = ApplicationAction.publisher
-            .compactMap { if case let .answerInboundCall(callId) = $0 { return callId }; return nil }
-            .flatMap { callId in
-                activeInvites.first()
-                    .flatMap { invites in
-                        invites[callId].map { invite in
-                            Future<VGVoiceCall,CallError>{ p in
-                                invite.answer { err, call in
-                                    p(err != nil ? Result.failure(CallError(id: callId, err: err)) : Result.success(call!))
-                                }
+        let rejectedInvites = activeInvites.map { invites in
+            ApplicationAction.publisher
+                .compactMap { if case let .rejectInboundCall(callId) = $0 { return callId }; return nil }
+                .flatMap { callId in
+                    invites[callId].map { invite in
+                        Future<Void,CallError>{ p in
+                            invite.reject { err in
+                                p(err != nil ? Result.failure(CallError(id: callId, err: err)) : Result.success(()))
                             }
-                            .asResult()
-                            .eraseToAnyPublisher()
-                        } ?? Just(
-                            Result<VGVoiceCall,CallError>.failure(
-                                CallError(id: callId, err:ApplicationErrors.unknown)
-                            )
-                        ).eraseToAnyPublisher()
-                    }.eraseToAnyPublisher()
-            }
+                        }
+                        .asResult()
+                    } ?? Just(
+                        Result<Void,CallError>.failure(
+                            CallError(id: callId, err:ApplicationErrors.unknown)
+                        )
+                    ).eraseToAnyPublisher()
+                }.eraseToAnyPublisher()
+        }
+            .switchToLatest()
             .share()
-            .eraseToAnyPublisher()
-        
-        let rejectedInvites = ApplicationAction.publisher
-            .compactMap { if case let .rejectInboundCall(callId) = $0 { return callId }; return nil }
-            .flatMap { callId in
-                activeInvites.first()
-                    .flatMap { invites in
-                        invites[callId].map { invite in
-                            Future<Void,CallError>{ p in
-                                invite.reject { err in
-                                    p(err != nil ? Result.failure(CallError(id: callId, err: err)) : Result.success(()))
-                                }
-                            }
-                            .asResult()
-                        } ?? Just(
-                            Result<Void,CallError>.failure(
-                                CallError(id: callId, err:ApplicationErrors.unknown)
-                            )
-                        ).eraseToAnyPublisher()
-                    }.eraseToAnyPublisher()
-            }
-            .eraseToAnyPublisher()
         
         // MARK: Calls
         
@@ -215,12 +214,13 @@ extension CallController: ApplicationController {
                 else { new[update.id] = update.1 }
                 return new
             }
-            .share()
+            .multicast(subject:CurrentValueSubject<[UUID:VGVoiceCall],Never>([:]))
+            .autoconnect()
         
-        let finishedCalls = ApplicationAction.publisher
-            .compactMap { if case let .hangupCall(callId) = $0 { return callId }; return nil }
-            .flatMap{ callId  in
-                currentActiveCalls.first().flatMap { calls in
+        let finishedCalls = currentActiveCalls.map { calls in
+            ApplicationAction.publisher
+                .compactMap { if case let .hangupCall(callId) = $0 { return callId }; return nil }
+                .flatMap{ callId  in
                     calls[callId].map { call in
                         Future<UUID,CallError>{ p in
                             call.hangup { err in
@@ -230,10 +230,11 @@ extension CallController: ApplicationController {
                         .asResult()
                     }
                     ?? Just(Result.failure(CallError(id: callId, err: nil))).eraseToAnyPublisher()
+                    
                 }
-            }
+        }
+            .switchToLatest()
             .share()
-        
         
         let errors = rejectedInvites
             .merge(with: outboundCalls.map { $0.map {_ in ()} })
@@ -256,7 +257,7 @@ extension CallController: ApplicationController {
                     .merge(with: finishedCalls
                         .compactMap { try? $0.get() }
                         .map {
-                            (call:$0, leg:$0, status:"localHangup")
+                            (call:$0, leg:$0, status:LocalComplete)
                         }
                     )
                     .filter { $0.call == UUID(uuidString: vgcall.callId)! }

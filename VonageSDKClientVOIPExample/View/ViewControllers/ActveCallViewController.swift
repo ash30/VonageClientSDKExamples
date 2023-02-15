@@ -20,7 +20,6 @@ class ActiveCallViewModel: ObservableObject {
             .receive(on: RunLoop.main)
             .assign(to: \.call, on:self)
             .store(in: &self.cancellables)
-        
     }
 }
 

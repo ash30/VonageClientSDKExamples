@@ -8,8 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		04BC063F8913B68CBD5AD164 /* Pods_VonageSDKClientVOIPExample.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9787D52D08CB941D75FB3450 /* Pods_VonageSDKClientVOIPExample.framework */; };
-		D12159232990502D001BB563 /* Vonage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12159222990502D001BB563 /* Vonage.swift */; };
-		D12159252991AF6D001BB563 /* AppDelegate+Startup.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12159242991AF6D001BB563 /* AppDelegate+Startup.swift */; };
 		D1215927299980E2001BB563 /* CallController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1215926299980E2001BB563 /* CallController.swift */; };
 		D121592A299982A4001BB563 /* CallController+VGVoiceDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1215929299982A4001BB563 /* CallController+VGVoiceDelegate.swift */; };
 		D121592E299983C2001BB563 /* AppErrors.swift in Sources */ = {isa = PBXBuildFile; fileRef = D121592D299983C2001BB563 /* AppErrors.swift */; };
@@ -34,16 +32,12 @@
 		D1F24388298187C600C49B3F /* LoginViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F24387298187C600C49B3F /* LoginViewController.swift */; };
 		D1F2438A2981902900C49B3F /* UserController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F243892981902900C49B3F /* UserController.swift */; };
 		D1F2438F2987370B00C49B3F /* ActveCallViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F2438E2987370B00C49B3F /* ActveCallViewController.swift */; };
-		D1F24393298B0DB200C49B3F /* Application.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F24392298B0DB200C49B3F /* Application.swift */; };
-		D1F24395298B0E1200C49B3F /* Call123.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F24394298B0E1200C49B3F /* Call123.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		349634D600C084FEBBC0823C /* Pods-VonageSDKClientVOIPExample.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-VonageSDKClientVOIPExample.debug.xcconfig"; path = "Target Support Files/Pods-VonageSDKClientVOIPExample/Pods-VonageSDKClientVOIPExample.debug.xcconfig"; sourceTree = "<group>"; };
 		6A29EF2241B7D3E5BF694A36 /* Pods-VonageSDKClientVOIPExample.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-VonageSDKClientVOIPExample.release.xcconfig"; path = "Target Support Files/Pods-VonageSDKClientVOIPExample/Pods-VonageSDKClientVOIPExample.release.xcconfig"; sourceTree = "<group>"; };
 		9787D52D08CB941D75FB3450 /* Pods_VonageSDKClientVOIPExample.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_VonageSDKClientVOIPExample.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		D12159222990502D001BB563 /* Vonage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Vonage.swift; sourceTree = "<group>"; };
-		D12159242991AF6D001BB563 /* AppDelegate+Startup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+Startup.swift"; sourceTree = "<group>"; };
 		D1215926299980E2001BB563 /* CallController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallController.swift; sourceTree = "<group>"; };
 		D1215929299982A4001BB563 /* CallController+VGVoiceDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CallController+VGVoiceDelegate.swift"; sourceTree = "<group>"; };
 		D121592D299983C2001BB563 /* AppErrors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppErrors.swift; sourceTree = "<group>"; };
@@ -71,8 +65,6 @@
 		D1F243892981902900C49B3F /* UserController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserController.swift; sourceTree = "<group>"; };
 		D1F2438D298553B800C49B3F /* VonageSDKClientVOIPExample.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VonageSDKClientVOIPExample.entitlements; sourceTree = "<group>"; };
 		D1F2438E2987370B00C49B3F /* ActveCallViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActveCallViewController.swift; sourceTree = "<group>"; };
-		D1F24392298B0DB200C49B3F /* Application.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application.swift; sourceTree = "<group>"; };
-		D1F24394298B0E1200C49B3F /* Call123.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Call123.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -197,25 +189,13 @@
 				D121593129998512001BB563 /* Model */,
 				D1F24396298B0F8200C49B3F /* Controllers */,
 				D1F24391298B0D5700C49B3F /* View */,
-				D1F24390298B0D4200C49B3F /* State */,
 				D1F2438D298553B800C49B3F /* VonageSDKClientVOIPExample.entitlements */,
-				D12159242991AF6D001BB563 /* AppDelegate+Startup.swift */,
 				D1521C322999A86600E7D572 /* utils.swift */,
 				D1F2437B2981846E00C49B3F /* Assets.xcassets */,
 				D1F2437D2981846E00C49B3F /* LaunchScreen.storyboard */,
 				D1F243802981846E00C49B3F /* Info.plist */,
 			);
 			path = VonageSDKClientVOIPExample;
-			sourceTree = "<group>";
-		};
-		D1F24390298B0D4200C49B3F /* State */ = {
-			isa = PBXGroup;
-			children = (
-				D1F24392298B0DB200C49B3F /* Application.swift */,
-				D1F24394298B0E1200C49B3F /* Call123.swift */,
-				D12159222990502D001BB563 /* Vonage.swift */,
-			);
-			path = State;
 			sourceTree = "<group>";
 		};
 		D1F24391298B0D5700C49B3F /* View */ = {
@@ -362,13 +342,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				D1521C332999A86600E7D572 /* utils.swift in Sources */,
-				D12159232990502D001BB563 /* Vonage.swift in Sources */,
-				D12159252991AF6D001BB563 /* AppDelegate+Startup.swift in Sources */,
 				D1215930299984FA001BB563 /* PushController.swift in Sources */,
 				D1F2438F2987370B00C49B3F /* ActveCallViewController.swift in Sources */,
 				D1215927299980E2001BB563 /* CallController.swift in Sources */,
-				D1F24395298B0E1200C49B3F /* Call123.swift in Sources */,
-				D1F24393298B0DB200C49B3F /* Application.swift in Sources */,
 				D1521C44299C395F00E7D572 /* CircularButton.swift in Sources */,
 				D121592E299983C2001BB563 /* AppErrors.swift in Sources */,
 				D121592A299982A4001BB563 /* CallController+VGVoiceDelegate.swift in Sources */,

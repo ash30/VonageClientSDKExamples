@@ -69,7 +69,9 @@ extension SceneDelegate {
                 }
                 else {
                     let dialerVC = self.createViewController(DialerViewController.self)
-                    self.window?.rootViewController = UINavigationController(rootViewController:dialerVC)
+                    self.nav = UINavigationController(rootViewController:dialerVC)
+                    self.window?.rootViewController = self.nav
+
                 }
                 
             }
