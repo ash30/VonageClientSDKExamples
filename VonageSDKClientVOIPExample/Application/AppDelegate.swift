@@ -36,7 +36,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         
         ApplicationAction.post(.userAuth(uname: "", pword: ""))
 
-                
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setCategory(AVAudioSession.Category.playAndRecord, mode: .default)
+            try audioSession.setMode(AVAudioSession.Mode.voiceChat)
+        } catch {
+            print(error)
+        }
+        
+        
         return true
     }
 

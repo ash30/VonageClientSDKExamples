@@ -15,8 +15,6 @@ let VonageLegStatusRinging = "ringing"
 let VonageLegStatusAnswered = "answered"
 let VonageLegStatusCompleted = "completed"
 let LocalComplete = "LocalComplete"
-let LocalReject = "LocalReject"
-
 
 extension CallController: VGVoiceClientDelegate {
     

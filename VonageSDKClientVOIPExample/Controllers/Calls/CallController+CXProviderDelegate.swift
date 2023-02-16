@@ -93,6 +93,8 @@ extension CallController {
                         self.callProvider.reportOutgoingCall(with: call.id, connectedAt: Date.now)
                     case .rejected:
                         self.callProvider.reportCall(with: call.id, endedAt: Date.now, reason: .remoteEnded)
+                    case .completed(remote: true):
+                        self.callProvider.reportCall(with: call.id, endedAt: Date.now, reason: .remoteEnded)
                     default:
                         return
                     }
@@ -100,6 +102,8 @@ extension CallController {
                     switch (status) {
                     case .canceled:
                         self.callProvider.reportCall(with: call.id, endedAt: Date.now, reason: .unanswered)
+                    case .completed(remote: true):
+                        self.callProvider.reportCall(with: call.id, endedAt: Date.now, reason: .remoteEnded)
                     default:
                         return
                     }

@@ -15,9 +15,11 @@ enum CallStatus {
     case answered
     case rejected
     case canceled
-    case completed
+    case completed(remote:Bool)
     case unknown
 }
+
+extension CallStatus: Equatable {}
 
 struct CallError: Error {
     let id:UUID?
@@ -85,8 +87,10 @@ enum OneToOneCall {
         /// We introduce a specific local status so we can differentiate local cancel from remote reject
         case .ringing where input.status == LocalComplete:
             return .canceled
+        case .answered where input.status == LocalComplete:
+            return .completed(remote: false)
         case .answered where input.status == VonageLegStatusCompleted:
-            return .completed
+            return .completed(remote: true)
         default:
             return self.status
         }
@@ -98,10 +102,12 @@ enum OneToOneCall {
             return .answered
         case .ringing where input.status == VonageLegStatusCompleted:
             return .canceled
-        case .ringing where input.status == LocalReject:
+        case .ringing where input.status == LocalComplete:
             return .rejected
+        case .answered where input.status == LocalComplete:
+            return .completed(remote: false)
         case .answered where input.status == VonageLegStatusCompleted:
-            return .completed
+            return .completed(remote: true)
         default:
             return self.status
         }

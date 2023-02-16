@@ -310,6 +310,12 @@ extension CallController: ApplicationController {
                 
                 return self.vonageCallHangup
                     .merge(with: self.vonageLegStatus)
+                    .merge(with: finishedCalls
+                        .compactMap { try? $0.result.get() }
+                        .map {
+                            (call:$0, leg:$0, status:LocalComplete)
+                        }
+                    )
                     .filter { $0.call == call.id}
                     .scan(call) { call, legStatus in
                         Call(call: call, status: call.nextState(input: legStatus))
