@@ -16,7 +16,7 @@ typealias CallStream = AnyPublisher<Call,Never>
 
 class CallController: NSObject {
     let client: VGVoiceClient
-    private var cancellables = Set<AnyCancellable>()
+    var cancellables = Set<AnyCancellable>()
     
     // VGClient Delegate Methods as Subjects
     let vonageWillReconnect = PassthroughSubject<Void, Never>()
@@ -26,6 +26,19 @@ class CallController: NSObject {
     let vonageLegStatus = PassthroughSubject<CallUpdate, Never>()
     let vonageCallHangup = PassthroughSubject<CallUpdate, Never>()
         
+    // Callkit
+    lazy var callProvider = { () -> CXProvider in
+        let provider = CXProvider(configuration: CXProviderConfiguration())
+        provider.setDelegate(self, queue: nil)
+        return provider
+    }()
+    lazy var cxController = CXCallController()
+    
+    // CXProvider Delegate Methods as Subjects
+    let callkitAnswer = PassthroughSubject<CXAnswerCallAction,Never>()
+    let callkitHangup = PassthroughSubject<CXEndCallAction,Never>()
+    let callkitStartOutbound = PassthroughSubject<CXStartCallAction,Never>()
+    
     var callErrors = PassthroughSubject<CallError,Never>()
     
     init(client:VGVoiceClient){
@@ -42,6 +55,7 @@ extension CallController: ApplicationController {
     func bindToApplicationState(_ state: ApplicationState) {
         setupSession(state)
         setupCallHandlers(state)
+        setupCallkit(state)
     }
     
     func setupSession(_ state:ApplicationState) {
@@ -129,7 +143,6 @@ extension CallController: ApplicationController {
     func setupCallHandlers(_ state:ApplicationState) {
         
         // MARK: VGInvites
-        
         let pushInvites = state.voipPush
             .map { payload in
                 state.vonageToken.flatMap { token in
@@ -155,46 +168,48 @@ extension CallController: ApplicationController {
             }
             .multicast(subject:CurrentValueSubject<[UUID:VGVoiceInvite],Never>([:]))
             .autoconnect()
-         
+        
+        
+        // Answers
+        let answer: (VGVoiceInvite) -> Future<VGVoiceCall,Error> = { invite in
+            Future<VGVoiceCall,Error>{ p in
+                invite.answer { err, call in
+                    p(err != nil ? Result.failure(err!) : Result.success(call!))
+                }
+            }
+        }
+        
         let answeredInvites = activeInvites.map { invites in
-            ApplicationAction.publisher
-                .compactMap { if case let .answerInboundCall(callId,_) = $0 { return callId }; return nil }
-                .flatMap { callId in
-                    invites[callId].map { invite in
-                        Future<VGVoiceCall,CallError>{ p in
-                            invite.answer { err, call in
-                                p(err != nil ? Result.failure(CallError(id: callId, err: err)) : Result.success(call!))
-                            }
-                        }
-                        .asResult()
-                        .eraseToAnyPublisher()
-                    } ?? Just(
-                        Result<VGVoiceCall,CallError>.failure(
-                            CallError(id: callId, err:ApplicationErrors.unknown)
-                        )
+            self.callkitAnswer
+                .flatMap { action in
+                    let stream = invites[action.callUUID].map { answer($0).asResult() }
+                    ?? Just(
+                        Result<VGVoiceCall,Error>.failure(ApplicationErrors.unknown)
                     ).eraseToAnyPublisher()
+                    
+                    return stream.map{ AppActionResult(tid: action.uuid, callid: action.callUUID, result: $0) }
                 }
         }
             .switchToLatest()
             .share()
         
+        // Rejects
+        // Callkit uses the same CXAction for reject + hangup
+        
+        let reject: (VGVoiceInvite) -> Future<Void,Error> = { invite in
+            Future<Void,Error>{ p in
+                invite.reject { err in
+                    p(err != nil ? Result.failure(err!) : Result.success(()))
+                }
+            }
+        }
+        
         let rejectedInvites = activeInvites.map { invites in
-            ApplicationAction.publisher
-                .compactMap { if case let .rejectInboundCall(callId) = $0 { return callId }; return nil }
-                .flatMap { callId in
-                    invites[callId].map { invite in
-                        Future<Void,CallError>{ p in
-                            invite.reject { err in
-                                p(err != nil ? Result.failure(CallError(id: callId, err: err)) : Result.success(()))
-                            }
-                        }
-                        .asResult()
-                    } ?? Just(
-                        Result<Void,CallError>.failure(
-                            CallError(id: callId, err:ApplicationErrors.unknown)
-                        )
-                    ).eraseToAnyPublisher()
-                }.eraseToAnyPublisher()
+            self.callkitHangup.flatMap{ action in
+                let stream = invites[action.callUUID].map { reject($0).asResult().eraseToAnyPublisher() }
+                ?? Empty().eraseToAnyPublisher()
+                return stream.map { AppActionResult(tid: action.uuid, callid: action.callUUID, result: $0.map {_ in action.callUUID } ) }
+            }
         }
             .switchToLatest()
             .share()
@@ -202,25 +217,22 @@ extension CallController: ApplicationController {
         // MARK: VGCalls
         
         let outboundCalls = ApplicationAction.publisher
-            .compactMap { if case let .newOutboundCall(context) = $0 {return context}; return nil}
-            .flatMap { context in
-                Future{ p in
-                    self.client.serverCall(context) { err, call in
+            .compactMap { if case let .newOutboundCall(context) = $0.action {return ($0.tid,context)}; return nil}
+            .flatMap { (t:(UUID, [String:Any])) in
+                Future<VGVoiceCall,Error>{ p in
+                    self.client.serverCall(t.1) { err, call in
                         (err != nil) ? p(Result.failure(err!)) : p(Result.success(call!))
                     }
                 }
-                .mapError { CallError(id: nil, err: $0) }
                 .asResult()
+                .map { AppActionResult(tid: t.0, callid: nil, result: $0) }
             }
             .share()
             .eraseToAnyPublisher()
         
-        
-        // MARK: APPLICATION Calls
-        
         let allNewCalls = answeredInvites
             .merge(with:outboundCalls)
-            .compactMap { try? $0.get() }
+            .compactMap { try? $0.result.get() }
             .map { (id:UUID(uuidString: $0.callId)!, call:$0 as VGVoiceCall?)}
         
         let currentActiveCalls = allNewCalls
@@ -234,100 +246,49 @@ extension CallController: ApplicationController {
             .multicast(subject:CurrentValueSubject<[UUID:VGVoiceCall],Never>([:]))
             .autoconnect()
         
+
+        // MARK: HANGUP
+        
+        let hangup: (VGVoiceCall) -> Future<Void,Error> = { call in
+            Future<Void,Error>{ p in
+                call.hangup { err in
+                    p(err == nil ? Result.success(()) : Result.failure(err!))
+                }
+            }
+        }
+        
         let finishedCalls = currentActiveCalls.map { calls in
-            ApplicationAction.publisher
-                .compactMap { if case let .hangupCall(callId,_) = $0 { return callId }; return nil }
-                .flatMap{ callId  in
-                    calls[callId].map { call in
-                        Future<UUID,CallError>{ p in
-                            call.hangup { err in
-                                p(err == nil ? Result.success(callId) : Result.failure(CallError(id: callId, err: err)))
-                            }
-                        }
-                        .asResult()
-                    }
-                    ?? Just(Result.failure(CallError(id: callId, err: nil))).eraseToAnyPublisher()
-                    
+            self.callkitHangup
+                .flatMap{ action in
+                    let stream = calls[action.callUUID].map { hangup($0).asResult().eraseToAnyPublisher() }
+                    ?? Empty().eraseToAnyPublisher()
+                    return stream.map { AppActionResult(tid: action.uuid, callid: action.callUUID, result: $0.map {_ in action.callUUID } ) }
                 }
         }
             .switchToLatest()
             .share()
+
         
-        // We need to keep Callkit in sync with our Call Controller
-        // here we report the result of hangups initiated by callkit UI back to originating CXAction
-        ApplicationAction.publisher
-            .compactMap { if case let .hangupCall(_,cxaction) = $0 { return cxaction }; return nil }
-            .flatMap { (action:CXEndCallAction) in
-                finishedCalls
-                    .filter { result in
-                        switch(result){
-                        case .success(let uuid): return uuid == action.callUUID
-                        case.failure(let err): return (err.id ?? UUID()) == action.callUUID
-                        }
-                    }
-                    .map {
-                        (action, $0.map{ _ in Void()}.mapError{$0 as Error})
-                    }
-                    .merge(with: Just((action, Result<Void,Error>.failure(ApplicationErrors.unknown))).delay(for: 10.0, scheduler: RunLoop.main) )
-                    .first()
-            }
-            .sink { (action,result) in
-                switch (result) {
-                case .success:
-                    action.fulfill()
-                case .failure:
-                    action.fail()
-                }
-            }
-            .store(in: &cancellables)
+        let transactions = rejectedInvites.map { $0.asAnyResult() }
+            .merge(with: outboundCalls.map { $0.asAnyResult() })
+            .merge(with: answeredInvites.map { $0.asAnyResult() })
+            .merge(with: finishedCalls.map { $0.asAnyResult() })
+            .share()
+       
         
-        // Same for answers
-        ApplicationAction.publisher
-            .compactMap { if case let .answerInboundCall(_,cxaction) = $0 { return cxaction }; return nil }
-            .flatMap { (action:CXAnswerCallAction) in
-                answeredInvites
-                    .filter { result in
-                        switch(result){
-                        case .success(let call): return (UUID(uuidString: call.callId)!) == action.callUUID
-                        case.failure(let err): return (err.id ?? UUID()) == action.callUUID
-                        }
-                    }
-                    .map {
-                        (action, $0.map{ _ in Void()}.mapError{$0 as Error})
-                    }
-                    .merge(with: Just((action, Result<Void,Error>.failure(ApplicationErrors.unknown))).delay(for: 10.0, scheduler: RunLoop.main) )
-                    .first()
-            }
-            .sink { (action,result) in
-                switch (result) {
-                case .success:
-                    action.fulfill()
-                case .failure:
-                    action.fail()
-                }
-            }
-            .store(in: &cancellables)
-        
-        let errors = rejectedInvites
-            .merge(with: outboundCalls.map { $0.map {_ in ()} })
-            .merge(with: answeredInvites.map { $0.map {_ in ()} })
-            .merge(with: finishedCalls.map { $0.map {_ in ()} })
-            .compactMap { if case let .failure(err) = $0 { return err }; return nil}
-        
-        errors
-            .sink { self.callErrors.send($0)}
-            .store(in: &self.cancellables)
-        
+        transactions.sink {
+            state.transactions.send($0)
+        }.store(in: &cancellables)
         
         // MARK: CAll Streams
         
         let outboundStreams = outboundCalls
-            .compactMap { try? $0.get()}
+            .compactMap { try? $0.result.get()}
             .map { (vgcall:VGVoiceCall) -> AnyPublisher<Call,Never> in
                 let call = Call.outbound(id: UUID(uuidString: vgcall.callId)!, to: "", status: .ringing)
                 return self.vonageLegStatus
                     .merge(with: finishedCalls
-                        .compactMap { try? $0.get() }
+                        .compactMap { try? $0.result.get() }
                         .map {
                             (call:$0, leg:$0, status:LocalComplete)
                         }
@@ -336,7 +297,9 @@ extension CallController: ApplicationController {
                     .scan(call) { call, update in
                         Call(call: call, status: call.nextState(input: update))
                     }
-                    .prepend(call)
+                    .removeDuplicates(by: {a,b in a.status == b.status })
+//                    .prepend(call)
+                    .share()
                     .eraseToAnyPublisher()
             }
         
@@ -355,7 +318,7 @@ extension CallController: ApplicationController {
                     .eraseToAnyPublisher()
             }
         
-        // Final Public Call Observable
+        // Final public Call Observable
         let callStreams = inboundStreams.merge(with: outboundStreams)
         
         callStreams

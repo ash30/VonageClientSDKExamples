@@ -35,7 +35,7 @@ extension PushController: ApplicationController {
             .combineLatest(
                 ApplicationAction
                     .publisher
-                    .filter { if case .initialisePush = $0 { return true }; return false  }
+                    .filter { if case .initialisePush = $0.action { return true }; return false  }
 
             )
             .first()
@@ -63,7 +63,7 @@ extension PushController: ApplicationController {
         // VOIP
         let voipTokenInit =  ApplicationAction
             .publisher
-            .filter { if case .initialisePush = $0 { return true }; return false  }
+            .filter { if case .initialisePush = $0.action { return true }; return false  }
             .first()
         
         voipTokenInit.sink { _ in

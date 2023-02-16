@@ -18,12 +18,11 @@
 		D121593D2999A2A6001BB563 /* Connection.swift in Sources */ = {isa = PBXBuildFile; fileRef = D121593C2999A2A6001BB563 /* Connection.swift */; };
 		D1521C332999A86600E7D572 /* utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1521C322999A86600E7D572 /* utils.swift */; };
 		D1521C36299A555800E7D572 /* AppActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1521C35299A555800E7D572 /* AppActions.swift */; };
-		D1521C3C299B0D0000E7D572 /* CallKitController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1521C3B299B0D0000E7D572 /* CallKitController.swift */; };
-		D1521C3E299B15C400E7D572 /* CallKitController+CXProviderDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1521C3D299B15C400E7D572 /* CallKitController+CXProviderDelegate.swift */; };
 		D1521C40299B8A7800E7D572 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1521C3F299B8A7800E7D572 /* AppState.swift */; };
 		D1521C44299C395F00E7D572 /* CircularButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1521C43299C395F00E7D572 /* CircularButton.swift */; };
 		D1521C46299C396800E7D572 /* DialerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1521C45299C396800E7D572 /* DialerView.swift */; };
 		D1521C48299C410A00E7D572 /* CircularRingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1521C47299C410A00E7D572 /* CircularRingView.swift */; };
+		D1521C4A299DA37B00E7D572 /* CallController+CXProviderDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1521C49299DA37B00E7D572 /* CallController+CXProviderDelegate.swift */; };
 		D1F243732981846C00C49B3F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F243722981846C00C49B3F /* AppDelegate.swift */; };
 		D1F243752981846C00C49B3F /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F243742981846C00C49B3F /* SceneDelegate.swift */; };
 		D1F243772981846C00C49B3F /* DialerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F243762981846C00C49B3F /* DialerViewController.swift */; };
@@ -48,12 +47,11 @@
 		D121593C2999A2A6001BB563 /* Connection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Connection.swift; sourceTree = "<group>"; };
 		D1521C322999A86600E7D572 /* utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = utils.swift; sourceTree = "<group>"; };
 		D1521C35299A555800E7D572 /* AppActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppActions.swift; sourceTree = "<group>"; };
-		D1521C3B299B0D0000E7D572 /* CallKitController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallKitController.swift; sourceTree = "<group>"; };
-		D1521C3D299B15C400E7D572 /* CallKitController+CXProviderDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CallKitController+CXProviderDelegate.swift"; sourceTree = "<group>"; };
 		D1521C3F299B8A7800E7D572 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		D1521C43299C395F00E7D572 /* CircularButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircularButton.swift; sourceTree = "<group>"; };
 		D1521C45299C396800E7D572 /* DialerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialerView.swift; sourceTree = "<group>"; };
 		D1521C47299C410A00E7D572 /* CircularRingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircularRingView.swift; sourceTree = "<group>"; };
+		D1521C49299DA37B00E7D572 /* CallController+CXProviderDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CallController+CXProviderDelegate.swift"; sourceTree = "<group>"; };
 		D1F2436F2981846C00C49B3F /* VonageSDKClientVOIPExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VonageSDKClientVOIPExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D1F243722981846C00C49B3F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D1F243742981846C00C49B3F /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -91,6 +89,7 @@
 			isa = PBXGroup;
 			children = (
 				D1215926299980E2001BB563 /* CallController.swift */,
+				D1521C49299DA37B00E7D572 /* CallController+CXProviderDelegate.swift */,
 				D1215929299982A4001BB563 /* CallController+VGVoiceDelegate.swift */,
 			);
 			path = Calls;
@@ -133,15 +132,6 @@
 				D1521C3F299B8A7800E7D572 /* AppState.swift */,
 			);
 			path = Application;
-			sourceTree = "<group>";
-		};
-		D1521C3A299B0CF000E7D572 /* CallKit */ = {
-			isa = PBXGroup;
-			children = (
-				D1521C3B299B0D0000E7D572 /* CallKitController.swift */,
-				D1521C3D299B15C400E7D572 /* CallKitController+CXProviderDelegate.swift */,
-			);
-			path = CallKit;
 			sourceTree = "<group>";
 		};
 		D1521C41299C393700E7D572 /* UIViews */ = {
@@ -210,7 +200,6 @@
 		D1F24396298B0F8200C49B3F /* Controllers */ = {
 			isa = PBXGroup;
 			children = (
-				D1521C3A299B0CF000E7D572 /* CallKit */,
 				D121593729998FB2001BB563 /* User */,
 				D121592829998146001BB563 /* Calls */,
 				D12159342999874B001BB563 /* Push */,
@@ -348,17 +337,16 @@
 				D1521C44299C395F00E7D572 /* CircularButton.swift in Sources */,
 				D121592E299983C2001BB563 /* AppErrors.swift in Sources */,
 				D121592A299982A4001BB563 /* CallController+VGVoiceDelegate.swift in Sources */,
+				D1521C4A299DA37B00E7D572 /* CallController+CXProviderDelegate.swift in Sources */,
 				D1F2438A2981902900C49B3F /* UserController.swift in Sources */,
 				D1521C36299A555800E7D572 /* AppActions.swift in Sources */,
 				D121593D2999A2A6001BB563 /* Connection.swift in Sources */,
 				D1521C46299C396800E7D572 /* DialerView.swift in Sources */,
 				D1F24388298187C600C49B3F /* LoginViewController.swift in Sources */,
-				D1521C3E299B15C400E7D572 /* CallKitController+CXProviderDelegate.swift in Sources */,
 				D121593329998536001BB563 /* Call.swift in Sources */,
 				D1F243772981846C00C49B3F /* DialerViewController.swift in Sources */,
 				D1521C40299B8A7800E7D572 /* AppState.swift in Sources */,
 				D1F243732981846C00C49B3F /* AppDelegate.swift in Sources */,
-				D1521C3C299B0D0000E7D572 /* CallKitController.swift in Sources */,
 				D121593629998779001BB563 /* PushController+PKPushRegistryDelegate.swift in Sources */,
 				D1F243752981846C00C49B3F /* SceneDelegate.swift in Sources */,
 				D121593929998FE6001BB563 /* User.swift in Sources */,

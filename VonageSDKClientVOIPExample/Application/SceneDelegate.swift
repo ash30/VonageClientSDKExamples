@@ -87,7 +87,7 @@ extension SceneDelegate {
                 if (type(of:self.nav.topViewController) != ActiveCallViewController.self) {
                     let vc = ActiveCallViewController()
                     self.nav.pushViewController(vc, animated: true)
-                    newcall.first().sink { call in
+                    newcall.receive(on: RunLoop.main).first().sink { call in
                         vc.viewModel = ActiveCallViewModel(for: Just(call).merge(with: newcall))
                     }.store(in: &self.cancellables)
                 }
