@@ -28,8 +28,12 @@ class CallController: NSObject {
         
     // Callkit
     lazy var callProvider = { () -> CXProvider in
-        let provider = CXProvider(configuration: CXProviderConfiguration())
+        var config = CXProviderConfiguration()
+        config.supportsVideo = false
+        let provider = CXProvider(configuration: config)
         provider.setDelegate(self, queue: nil)
+        
+        
         return provider
     }()
     lazy var cxController = CXCallController()
@@ -39,8 +43,10 @@ class CallController: NSObject {
     let callkitHangup = PassthroughSubject<CXEndCallAction,Never>()
     let callkitStartOutbound = PassthroughSubject<CXStartCallAction,Never>()
     
-    var callErrors = PassthroughSubject<CallError,Never>()
-    
+
+    let transactions = PassthroughSubject<AnyAppActionResult,Never>()
+
+        
     init(client:VGVoiceClient){
         self.client = client
         super.init()
@@ -274,10 +280,9 @@ extension CallController: ApplicationController {
             .merge(with: answeredInvites.map { $0.asAnyResult() })
             .merge(with: finishedCalls.map { $0.asAnyResult() })
             .share()
-       
         
         transactions.sink {
-            state.transactions.send($0)
+            self.transactions.send($0)
         }.store(in: &cancellables)
         
         // MARK: CAll Streams

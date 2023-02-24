@@ -24,10 +24,7 @@ class ApplicationState: ObservableObject {
     // Calls
     @Published var connection: Connection = .disconnected(err: nil)
     let newCalls = PassthroughSubject<CallStream,Never>()
-    
-    // CallKit
-    let newCXActions = PassthroughSubject<CXAction,Never>()
-    
+        
     // Push
     @Published var deviceToken: Data? = nil
     @Published var voipToken: Data? = nil

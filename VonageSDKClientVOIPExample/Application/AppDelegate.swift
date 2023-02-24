@@ -22,7 +22,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Create Application Object Graph
-        VGBaseClient.setDefaultLoggingLevel(.verbose)
+//        VGBaseClient.setDefaultLoggingLevel(.verbose)
         let vonage = VGVoiceClient()
         vonage.setConfig(.init(region: .US))
         
@@ -35,16 +35,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         ApplicationAction.post(.initialisePush)
         
         ApplicationAction.post(.userAuth(uname: "", pword: ""))
-
-        let audioSession = AVAudioSession.sharedInstance()
-        do {
-            try audioSession.setCategory(AVAudioSession.Category.playAndRecord, mode: .default)
-            try audioSession.setMode(AVAudioSession.Mode.voiceChat)
-        } catch {
-            print(error)
+        
+        print(AVAudioSession.sharedInstance().currentRoute.outputs, "FOO:\(#function)")
+        try? AVAudioSession.sharedInstance().setActive(true)
+        
+        let mediaType = AVMediaType.audio
+        let authorizationStatus = AVCaptureDevice.authorizationStatus(for: mediaType)
+        switch authorizationStatus {
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: mediaType) { granted in
+                print("🎤 access \(granted ? "granted" : "denied")")
+            }
+        case .authorized, .denied, .restricted:
+            print("auth")
         }
-        
-        
+
         return true
     }
 

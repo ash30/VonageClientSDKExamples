@@ -8,8 +8,19 @@
 import Foundation
 import CallKit
 import VonageClientSDKVoice
+import AudioToolbox
 
 extension CallController: CXProviderDelegate {
+    
+    func configureAudioSession() {
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setCategory(AVAudioSession.Category.playAndRecord, mode: AVAudioSession.Mode.voiceChat, options: .allowBluetooth)
+        } catch {
+            print(error)
+        }
+    }
+    
     
     func providerDidReset(_ provider: CXProvider) {
     }
@@ -19,12 +30,18 @@ extension CallController: CXProviderDelegate {
         // 1. we create our vgcall first, so we can have the correct UUID
         // 2. We report to the cxcontroller afterwards
         // 3. here in the provider, we just call fulfill action right away
+        configureAudioSession()
         action.fulfill()
         self.callProvider.reportOutgoingCall(with: action.callUUID, startedConnectingAt: Date.now)
     }
-    
+
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction){
+        configureAudioSession()
+        
+//        _semaphore = dispatch_semaphore_create(0);
         self.callkitAnswer.send(action)
+        action.fulfill()
+
     }
     
     func provider(_ provider: CXProvider, perform action: CXEndCallAction){
@@ -32,9 +49,26 @@ extension CallController: CXProviderDelegate {
     }
     
     func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession){
+        
+        // When the mic and speakers are ready, enable audio within clientsdk
+//        NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)
+//            .map { _ in
+//                AVAudioSession.sharedInstance().currentRoute.outputs
+//            }
+//            .filter { !(($0.filter { $0.portType == .builtInReceiver }).isEmpty) }
+//            .first()
+//            .sink { _ in
+//                print(AVAudioSession.sharedInstance().currentRoute.outputs, "FOO:\(#function)")
+//                VGVoiceClient.enableAudio(audioSession)
+//            }.store(in: &self.cancellables)
+            print(AVAudioSession.sharedInstance().currentRoute.outputs, "FOO:\(#function)")
         VGVoiceClient.enableAudio(audioSession)
+
+        
+        
     }
     func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession){
+        print(AVAudioSession.sharedInstance().currentRoute.outputs, "FOO:\(#function)")
         VGVoiceClient.disableAudio(audioSession)
     }
 }
@@ -42,7 +76,6 @@ extension CallController: CXProviderDelegate {
 extension CallController {
     
     func setupCallkit(_ state:ApplicationState) {
-        
         // Pump our UI app actions through the cxcontroller
         // so we register them with callkit.
         ApplicationAction.publisher
@@ -67,7 +100,7 @@ extension CallController {
             .compactMap {
                 if case let .inbound(id,from,.ringing) = $0 {
                     let update = CXCallUpdate()
-                    update.localizedCallerName = from
+                    update.localizedCallerName = "foo"
                     return (id ,update)
                 }; return nil
             }
@@ -112,18 +145,21 @@ extension CallController {
             .store(in: &cancellables)
         
         // Report the result of Actions
-        self.callkitAnswer
-            .flatMap { action in
-                state.transactions.filter { $0.tid == action.uuid}.first().map { (action, $0.result) }
-            }
-            .sink { (action,result) in
-                switch(result){
-                case .failure:
-                    action.fail()
-                case .success:
-                    action.fulfill()
-                }
-            }.store(in: &cancellables)
+//        self.callkitAnswer
+//            .flatMap { action in
+//                state.transactions.filter { $0.tid == action.uuid}.first().map { (action, $0.result) }
+//            }
+//            .print("FOO:answer action")
+//
+////            .receive(on: RunLoop.main)
+//            .sink { (action,result) in
+//                switch(result){
+//                case .failure:
+//                    action.fail()
+//                case .success:
+//                    action.fulfill()
+//                }
+//            }.store(in: &cancellables)
         
         self.callkitHangup
             .flatMap { action in
